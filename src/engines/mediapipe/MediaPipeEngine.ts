@@ -3,11 +3,11 @@ import type { ChatEngine, ChatMessage, EngineCapabilities, EngineId, GenerateOpt
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@0.10.27/wasm";
 
-// Primary: Gemma 4 E2B official LiteRT task file
-// Fallback: Gemma 2 2B IT from MediaPipe's model registry
+// Primary: Gemma 4 E2B — litert-lm repo (web-optimized, ~2 GB)
+// Fallback: Gemma 3 270M — much smaller (249 MB), loads fast, good for demo
 const MODEL_URLS = [
-  "https://huggingface.co/litert-community/Gemma-4-E2B-it/resolve/main/gemma-4-e2b-it-int4-web.task",
-  "https://storage.googleapis.com/mediapipe-models/llm_inference/gemma-2b-it-gpu-int8.bin",
+  "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task",
+  "https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/gemma3-270m-it-q4_0-web.task",
 ];
 
 const SYSTEM_PROMPT =
