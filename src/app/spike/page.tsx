@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useGemmaWorker } from "@/hooks/useGemmaWorker";
 import { ModelLoader } from "@/components/ModelLoader";
 import { ChatInterface } from "@/components/ChatInterface";
 import { GpuDiagnostics } from "@/components/GpuDiagnostics";
+import { BenchmarkPanel } from "@/components/BenchmarkPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MODEL_SIZE_GB } from "@/lib/constants";
 import Link from "next/link";
-
-const BENCHMARK_PROMPT = "Cuenta del 1 al 50.";
-
-interface BenchmarkResult {
-  tps: number;
-  ttftMs: number;
-  totalMs: number;
-}
 
 export default function SpikePage() {
   const {
@@ -29,29 +22,6 @@ export default function SpikePage() {
     lastTotalMs,
     error,
   } = useGemmaWorker();
-
-  const [benchmarkRunning, setBenchmarkRunning] = useState(false);
-  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
-  const benchmarkPendingRef = useRef(false);
-
-  // Capture benchmark result when generation finishes
-  useEffect(() => {
-    if (benchmarkPendingRef.current && status === "ready" && tokensPerSecond !== null) {
-      benchmarkPendingRef.current = false;
-      setBenchmarkRunning(false);
-      setBenchmarkResult({
-        tps: tokensPerSecond,
-        ttftMs: lastTtftMs ?? 0,
-        totalMs: lastTotalMs ?? 0,
-      });
-    }
-  }, [status, tokensPerSecond, lastTtftMs, lastTotalMs]);
-
-  function handleBenchmark() {
-    setBenchmarkRunning(true);
-    benchmarkPendingRef.current = true;
-    generate(BENCHMARK_PROMPT);
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -70,7 +40,7 @@ export default function SpikePage() {
             </Link>
           </div>
           <p className="text-sm text-muted-foreground">
-            Technical spike: Gemma 4 E4B running 100% in-browser via WebGPU.
+            Technical spike: Gemma 4 E2B running 100% in-browser via WebGPU.
             Verify in DevTools → Network: zero requests during inference.
           </p>
         </div>
@@ -91,11 +61,15 @@ export default function SpikePage() {
         />
 
         {/* GPU Diagnostics */}
-        <GpuDiagnostics
+        <GpuDiagnostics />
+
+        {/* Benchmark Panel */}
+        <BenchmarkPanel
           modelStatus={status}
-          onBenchmark={handleBenchmark}
-          benchmarkResult={benchmarkResult}
-          benchmarkRunning={benchmarkRunning}
+          tokensPerSecond={tokensPerSecond}
+          lastTtftMs={lastTtftMs}
+          lastTotalMs={lastTotalMs}
+          onRun={generate}
         />
 
         {/* Per-file progress (shown while loading) */}
@@ -131,7 +105,7 @@ export default function SpikePage() {
         {/* Chat interface */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Chat with Gemma 4 E4B</CardTitle>
+            <CardTitle className="text-sm">Chat with Gemma 4 E2B</CardTitle>
           </CardHeader>
           <CardContent>
             <ChatInterface
@@ -145,10 +119,10 @@ export default function SpikePage() {
           </CardContent>
         </Card>
 
-        {/* DevTools hint */}
+        {/* Footer */}
         <p className="text-xs text-center text-muted-foreground">
-          Open DevTools → Network tab and verify: after the initial model
-          download, there are zero network requests during inference.
+          First load downloads ≈{MODEL_SIZE_GB} GB. After that: zero network,
+          works offline. Cached in your browser via OPFS.
         </p>
       </div>
     </div>

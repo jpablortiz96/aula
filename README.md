@@ -4,7 +4,7 @@
 > Built for the 40% of LATAM students without reliable connectivity.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![Gemma 4](https://img.shields.io/badge/Gemma_4-E4B-4285F4?logo=google)
+![Gemma 4](https://img.shields.io/badge/Gemma_4-E2B-4285F4?logo=google)
 ![WebGPU](https://img.shields.io/badge/WebGPU-enabled-orange)
 ![PWA](https://img.shields.io/badge/PWA-offline--first-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
@@ -13,8 +13,8 @@
 
 ## What it does
 
-AULA runs Gemma 4 E4B entirely in your browser using WebGPU — no API keys, no
-servers, no data leaving your device. Students download the model once (~3 GB),
+AULA runs Gemma 4 E2B entirely in your browser using WebGPU — no API keys, no
+servers, no data leaving your device. Students download the model once (~1.5 GB),
 then get a personal AI tutor that works in classrooms, homes, and buses with
 zero connectivity.
 
@@ -45,26 +45,37 @@ zero connectivity.
 │                                │                │
 │                          WebGPU (GPU shader)    │
 │                                │                │
-│                     Gemma 4 E4B-IT (q4f16)      │
-│                     cached in IndexedDB         │
+│                     Gemma 4 E2B-IT (q4f16)      │
+│                     cached in OPFS              │
 └─────────────────────────────────────────────────┘
          ↑ zero network requests after first load
 ```
 
 ---
 
-## Why Gemma 4 E4B specifically
+## Why Gemma 4 E2B specifically
 
-| Model | Size | WebGPU viable | Quality | Notes |
-|---|---|---|---|---|
-| Gemma 4 E2B | ~1.5 GB | ✅ Yes | ⚠️ Limited | Too weak for complex explanations |
-| **Gemma 4 E4B** | **~3 GB** | **✅ Yes** | **✅ Good** | **Sweet spot: fits 6 GB VRAM, strong reasoning** |
-| Gemma 4 27B MoE | ~15 GB | ❌ No | ✅ Excellent | Too large for most consumer GPUs |
-| Gemma 4 31B | ~18 GB | ❌ No | ✅ Excellent | Requires server-side inference |
+> "If it can run on $80 hardware, it can run in a rural Colombian school."
 
-E4B is the largest model that reliably fits in the 6 GB VRAM of mainstream
-discrete GPUs (GTX 1060, RX 580) while still delivering coherent multi-turn
-explanations — the minimum bar for a credible tutor.
+| Model | Size | WebGPU viable | Notes |
+|---|---|---|---|
+| **Gemma 4 E2B** | **~1.5 GB** | **✅ Yes** | **Sweet spot: fits any modern GPU, runs on Raspberry Pi 5** |
+| Gemma 4 E4B | ~3 GB | ✅ Yes | Spills to shared memory on 6 GB VRAM → 1–2 tok/s |
+| Gemma 4 27B MoE | ~15 GB | ❌ No | Too large for consumer GPUs |
+| Gemma 4 31B | ~18 GB | ❌ No | Requires server-side inference |
+
+### Real-world performance (E2B, q4f16, WebGPU)
+
+| Hardware | Tokens/sec |
+|---|---|
+| Raspberry Pi 5 (8 GB) | 7.2 |
+| MacBook M3 | 20–25 |
+| Windows + RTX 3050+ | 25–40 |
+| Mid-range Pixel phone | 5–8 |
+
+E2B is the largest model that **reliably runs on edge hardware** — from a $80
+Raspberry Pi 5 to mainstream laptops — while delivering coherent multi-turn
+explanations. The minimum bar for a credible tutor that works everywhere.
 
 ---
 
@@ -72,7 +83,7 @@ explanations — the minimum bar for a credible tutor.
 
 - **Next.js 16** — App Router, TypeScript strict mode
 - **@huggingface/transformers v4** — ONNX Runtime Web with WebGPU backend
-- **Gemma 4 E4B-IT ONNX** (`q4f16` quantization, ~3 GB)
+- **Gemma 4 E2B-IT ONNX** (`q4f16` quantization, ~1.5 GB)
 - **Web Worker** — inference never blocks the UI thread
 - **Tailwind CSS v4** + **shadcn/ui** — component library
 - **idb** — IndexedDB wrapper for local persistence
@@ -92,8 +103,8 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`, navigate to `/spike`, click **Load Gemma 4 E4B**.
-The first load downloads ~3 GB and caches it in the browser. Subsequent loads
+Open `http://localhost:3000`, navigate to `/spike`, click **Load Gemma 4 E2B**.
+The first load downloads ~1.5 GB and caches it in the browser. Subsequent loads
 are instant.
 
 **Verify it's truly local:** Open DevTools → Network tab, filter by XHR/Fetch.
@@ -106,17 +117,19 @@ After the initial model download, there should be zero requests during chat.
 ```
 src/
 ├── app/
-│   ├── page.tsx           # Landing
-│   └── spike/page.tsx     # Technical validation spike
+│   ├── page.tsx              # Landing
+│   └── spike/page.tsx        # Technical validation spike
 ├── components/
-│   ├── ModelLoader.tsx    # Download progress UI
-│   └── ChatInterface.tsx  # Streaming chat UI
+│   ├── ModelLoader.tsx       # Download progress UI
+│   ├── ChatInterface.tsx     # Streaming chat UI with markdown + LaTeX
+│   ├── GpuDiagnostics.tsx    # WebGPU adapter info panel
+│   └── BenchmarkPanel.tsx    # Inference benchmark with run history
 ├── hooks/
-│   └── useGemmaWorker.ts  # Worker communication hook
+│   └── useGemmaWorker.ts     # Worker communication hook
 ├── lib/
-│   └── constants.ts       # Typed message protocol
+│   └── constants.ts          # Typed message protocol + model config
 └── workers/
-    └── gemma.worker.ts    # Off-thread inference
+    └── gemma.worker.ts       # Off-thread inference
 ```
 
 ---

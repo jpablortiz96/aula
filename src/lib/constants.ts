@@ -1,4 +1,6 @@
-export const MODEL_ID = "onnx-community/gemma-4-E4B-it-ONNX";
+export const MODEL_ID = "onnx-community/gemma-4-E2B-it-ONNX";
+export const MODEL_DISPLAY_NAME = "Gemma 4 E2B";
+export const MODEL_SIZE_GB = 1.5;
 export const MODEL_DTYPE = "q4f16" as const;
 export const MODEL_DEVICE = "webgpu" as const;
 

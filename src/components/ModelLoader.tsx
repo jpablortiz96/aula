@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ModelStatus } from "@/lib/constants";
-import { MODEL_ID } from "@/lib/constants";
+import { type ModelStatus, MODEL_ID, MODEL_DISPLAY_NAME, MODEL_SIZE_GB } from "@/lib/constants";
 
 interface ModelLoaderProps {
   status: ModelStatus;
@@ -19,6 +18,10 @@ const STATUS_LABEL: Record<ModelStatus, string> = {
   generating: "Generating…",
   error: "Error",
 };
+
+const TOOLTIP =
+  `${MODEL_DISPLAY_NAME} is Google's smallest multimodal model — runs on edge devices ` +
+  "from an $80 Raspberry Pi 5 to high-end laptops. Quantized to q4f16 for WebGPU.";
 
 export function ModelLoader({ status, overallProgress, onLoad }: ModelLoaderProps) {
   const isLoading = status === "loading";
@@ -43,14 +46,14 @@ export function ModelLoader({ status, overallProgress, onLoad }: ModelLoaderProp
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-xs text-muted-foreground font-mono truncate">
+        <div className="text-xs text-muted-foreground font-mono truncate" title={MODEL_ID}>
           {MODEL_ID}
         </div>
 
         {isLoading && (
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Downloading weights (≈3 GB)…</span>
+              <span>Downloading weights (≈{MODEL_SIZE_GB} GB)…</span>
               <span>{overallProgress}%</span>
             </div>
             <Progress value={overallProgress} className="h-2" />
@@ -58,14 +61,20 @@ export function ModelLoader({ status, overallProgress, onLoad }: ModelLoaderProp
         )}
 
         {!isReady && (
-          <Button
-            onClick={onLoad}
-            disabled={isLoading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-            size="sm"
-          >
-            {isLoading ? "Loading…" : "Load Gemma 4 E4B (≈3 GB)"}
-          </Button>
+          <div className="space-y-1.5">
+            <Button
+              onClick={onLoad}
+              disabled={isLoading}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              size="sm"
+              title={TOOLTIP}
+            >
+              {isLoading
+                ? "Loading…"
+                : `Load ${MODEL_DISPLAY_NAME} (≈${MODEL_SIZE_GB} GB) — runs on a Raspberry Pi`}
+            </Button>
+            <p className="text-xs text-muted-foreground leading-snug">{TOOLTIP}</p>
+          </div>
         )}
 
         <div className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
