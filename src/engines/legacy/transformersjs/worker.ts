@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-// @deprecated Kept only for /spike legacy page. Use src/engines/ for new code.
+// @deprecated Use MediaPipeEngine or CloudBoostEngine instead.
+// Kept as legacy fallback for browsers where MediaPipe fails to load.
 export {};
 
 import {
@@ -19,7 +20,6 @@ import {
   type ChatMessage,
 } from "@/lib/constants";
 
-// Running inside the worker — no WASM proxy needed
 (env.backends.onnx as Record<string, unknown>).wasm = {
   ...(env.backends.onnx as Record<string, unknown>).wasm as object,
   proxy: false,
@@ -64,6 +64,20 @@ async function loadModel(): Promise<void> {
   }
 }
 
+const SYSTEM_PROMPT =
+  "Eres AULA, un tutor educativo para estudiantes latinoamericanos de secundaria.\n\n" +
+  "FORMATO de respuesta:\n" +
+  "1. Una frase de introducción cálida (1 línea, máximo 1 emoji).\n" +
+  "2. Explicación principal en 2-4 pasos numerados.\n" +
+  "3. Para matemáticas: LaTeX con $...$ (inline) o $$...$$ (display).\n" +
+  "4. Cierre con la respuesta final en **negrita**.\n\n" +
+  "REGLAS:\n" +
+  "- Español neutro latinoamericano.\n" +
+  "- Máximo 200 palabras por respuesta.\n" +
+  "- Nunca uses más de 2 emojis.\n" +
+  "- Si no estás seguro, dilo. No inventes datos.\n" +
+  "- Si la pregunta no es educativa, redirige amablemente.";
+
 async function generate(
   prompt: string,
   conversationHistory: ChatMessage[]
@@ -75,25 +89,8 @@ async function generate(
 
   post({ type: "status", status: "generating" });
 
-  const systemPrompt =
-    "Eres AULA, un tutor educativo para estudiantes latinoamericanos de secundaria.\n\n" +
-    "FORMATO de respuesta:\n" +
-    "1. Una frase de introducción cálida (1 línea, máximo 1 emoji).\n" +
-    "2. Explicación principal en 2-4 pasos numerados.\n" +
-    "3. Para matemáticas: LaTeX con $...$ (inline) o $$...$$ (display).\n" +
-    "4. Cierre con la respuesta final en **negrita**.\n\n" +
-    "REGLAS:\n" +
-    "- Español neutro latinoamericano.\n" +
-    "- Máximo 200 palabras por respuesta.\n" +
-    "- Nunca uses más de 2 emojis.\n" +
-    "- Si no estás seguro, dilo. No inventes datos.\n" +
-    "- Si la pregunta no es educativa, redirige amablemente.";
-
   const messages: ChatMessage[] = [
-    {
-      role: "user" as const,
-      content: `[SYSTEM] ${systemPrompt} [/SYSTEM]`,
-    },
+    { role: "user" as const, content: `[SYSTEM] ${SYSTEM_PROMPT} [/SYSTEM]` },
     ...conversationHistory,
     { role: "user" as const, content: prompt },
   ];

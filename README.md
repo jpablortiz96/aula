@@ -4,7 +4,7 @@
 > Built for the 40% of LATAM students without reliable connectivity.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![Gemma 4](https://img.shields.io/badge/Gemma_4-E2B-4285F4?logo=google)
+![Gemma 4](https://img.shields.io/badge/Gemma_4-E2B%20%2F%2031B-4285F4?logo=google)
 ![WebGPU](https://img.shields.io/badge/WebGPU-enabled-orange)
 ![PWA](https://img.shields.io/badge/PWA-offline--first-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
@@ -13,10 +13,11 @@
 
 ## What it does
 
-AULA runs Gemma 4 E2B entirely in your browser using WebGPU — no API keys, no
-servers, no data leaving your device. Students download the model once (~1.5 GB),
-then get a personal AI tutor that works in classrooms, homes, and buses with
-zero connectivity.
+AULA gives every LATAM student a personal AI tutor that works **without internet** after
+the first download. It auto-selects the best inference engine for your hardware:
+
+- **Local:** Gemma 4 E2B running in-browser via MediaPipe + WebGPU — zero data leaves your device.
+- **Cloud Boost:** Gemma 4 31B via Google AI Studio — for hardware without GPU, using your own free API key.
 
 ---
 
@@ -28,43 +29,60 @@ zero connectivity.
 
 ---
 
+## Architecture: Dual Engine
+
+```
+┌────────────────────────────────────────────┐
+│  Engine A: MediaPipe + Gemma 4 E2B (local) │
+│  → 100% offline after first download       │
+│  → Multimodal (vision + audio)             │
+│  → Optimized by Google for edge devices    │
+└────────────────────────────────────────────┘
+         OR (auto-selected by AULA)
+┌────────────────────────────────────────────┐
+│  Engine B: Google AI Studio + Gemma 4 31B  │
+│  → Cloud-boosted reasoning                 │
+│  → Opt-in with user's free API key         │
+│  → Falls back gracefully if no GPU         │
+└────────────────────────────────────────────┘
+The user never picks. AULA detects hardware and chooses.
+```
+
+### Why two engines?
+
+Real talk: `transformers.js` on NVIDIA Optimus laptops gave 2 tok/s — unusable.
+**MediaPipe is Google's purpose-built runtime for Gemma.** Real shipping > ideology.
+The ONNX Web engine is kept as a last-resort fallback (`/spike`) while MediaPipe
+stabilizes.
+
+---
+
 ## How it works
 
 ```
 ┌─────────────────────────────────────────────────┐
 │                   Browser Tab                   │
 │                                                 │
-│  Main Thread          Web Worker                │
+│  Main Thread          MediaPipe / CloudBoost    │
 │  ──────────           ──────────────────────    │
-│  React UI    ←─────── postMessage (tokens)      │
+│  React UI    ←─────── onToken callback          │
 │      │                    │                     │
-│      └──── postMessage ──→ @huggingface/        │
-│            (generate)      transformers.js      │
+│      └──── generate() ───→ Engine A or B        │
 │                                │                │
-│                          ONNX Runtime Web       │
+│                     Engine A: WASM + WebGPU     │
+│                     Engine B: fetch + SSE       │
 │                                │                │
-│                          WebGPU (GPU shader)    │
-│                                │                │
-│                     Gemma 4 E2B-IT (q4f16)      │
-│                     cached in OPFS              │
+│                     Gemma 4 E2B (local)         │
+│                     or Gemma 4 31B (cloud)      │
 └─────────────────────────────────────────────────┘
-         ↑ zero network requests after first load
+         ↑ zero network requests after first load (local)
 ```
 
 ---
 
-## Why Gemma 4 E2B specifically
+## Why Gemma 4 E2B for local
 
 > "If it can run on $80 hardware, it can run in a rural Colombian school."
-
-| Model | Size | WebGPU viable | Notes |
-|---|---|---|---|
-| **Gemma 4 E2B** | **~1.5 GB** | **✅ Yes** | **Sweet spot: fits any modern GPU, runs on Raspberry Pi 5** |
-| Gemma 4 E4B | ~3 GB | ✅ Yes | Spills to shared memory on 6 GB VRAM → 1–2 tok/s |
-| Gemma 4 27B MoE | ~15 GB | ❌ No | Too large for consumer GPUs |
-| Gemma 4 31B | ~18 GB | ❌ No | Requires server-side inference |
-
-### Real-world performance (E2B, q4f16, WebGPU)
 
 | Hardware | Tokens/sec |
 |---|---|
@@ -73,42 +91,38 @@ zero connectivity.
 | Windows + RTX 3050+ | 25–40 |
 | Mid-range Pixel phone | 5–8 |
 
-E2B is the largest model that **reliably runs on edge hardware** — from a $80
-Raspberry Pi 5 to mainstream laptops — while delivering coherent multi-turn
-explanations. The minimum bar for a credible tutor that works everywhere.
+E2B fits in the 2–4 GB VRAM of mainstream laptops — including Chromebooks with GPU.
+E4B spills to shared memory on 6 GB GPUs → 1–2 tok/s. Not good enough.
 
 ---
 
 ## Tech stack
 
 - **Next.js 16** — App Router, TypeScript strict mode
-- **@huggingface/transformers v4** — ONNX Runtime Web with WebGPU backend
-- **Gemma 4 E2B-IT ONNX** (`q4f16` quantization, ~1.5 GB)
-- **Web Worker** — inference never blocks the UI thread
+- **MediaPipe Tasks GenAI** — Google's official Gemma runtime for the web
+- **Google AI Studio API** — Cloud Boost fallback (user's own key, free tier)
+- **ONNX Web + transformers.js** — Legacy fallback (kept at `/spike`)
+- **Web Worker** — legacy inference never blocks the UI thread
+- **zustand** — engine selection state
 - **Tailwind CSS v4** + **shadcn/ui** — component library
-- **idb** — IndexedDB wrapper for local persistence
 - **Vercel** — static hosting (zero serverless functions)
 
 ---
 
 ## Run locally
 
-**Prerequisites:** Node.js 18+, pnpm, a browser with WebGPU support
-(Chrome 113+ / Edge 113+ recommended).
+**Prerequisites:** Node.js 18+, pnpm, Chrome 121+ or Edge (for WebGPU + `adapter.info`)
 
 ```bash
-git clone https://github.com/your-username/aula
+git clone https://github.com/jpablortiz96/aula
 cd aula
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`, navigate to `/spike`, click **Load Gemma 4 E2B**.
-The first load downloads ~1.5 GB and caches it in the browser. Subsequent loads
-are instant.
-
-**Verify it's truly local:** Open DevTools → Network tab, filter by XHR/Fetch.
-After the initial model download, there should be zero requests during chat.
+- `/chat` — main interface (auto-selects engine)
+- `/settings` — choose engine, paste API key
+- `/spike` — legacy ONNX Web validation spike
 
 ---
 
@@ -117,28 +131,34 @@ After the initial model download, there should be zero requests during chat.
 ```
 src/
 ├── app/
-│   ├── page.tsx              # Landing
-│   └── spike/page.tsx        # Technical validation spike
+│   ├── page.tsx                  # Landing
+│   ├── chat/page.tsx             # Main chat (dual engine)
+│   ├── settings/page.tsx         # Engine settings + API key
+│   └── spike/page.tsx            # Legacy ONNX spike (kept for comparison)
+├── engines/
+│   ├── types.ts                  # ChatEngine interface
+│   ├── EngineRegistry.ts         # Auto-detection + display names
+│   ├── mediapipe/                # Engine A: MediaPipe LLM Inference
+│   ├── cloud-boost/              # Engine B: Google AI Studio streaming
+│   └── legacy/                   # Engine C: ONNX Web (transformers.js)
 ├── components/
-│   ├── ModelLoader.tsx       # Download progress UI
-│   ├── ChatInterface.tsx     # Streaming chat UI with markdown + LaTeX
-│   ├── GpuDiagnostics.tsx    # WebGPU adapter info panel
-│   └── BenchmarkPanel.tsx    # Inference benchmark with run history
+│   ├── ChatInterface.tsx         # Streaming chat with markdown + LaTeX
+│   ├── GpuDiagnostics.tsx        # WebGPU adapter info
+│   └── BenchmarkPanel.tsx        # Inference benchmark with run history
 ├── hooks/
-│   └── useGemmaWorker.ts     # Worker communication hook
-├── lib/
-│   └── constants.ts          # Typed message protocol + model config
-└── workers/
-    └── gemma.worker.ts       # Off-thread inference
+│   ├── useChatEngine.ts          # Unified hook (all engines)
+│   └── useGemmaWorker.ts         # @deprecated — legacy only
+├── store/
+│   └── engineStore.ts            # zustand: engine selection + API key
+└── lib/
+    └── constants.ts              # Model config + worker message types
 ```
 
 ---
 
 ## Submission context
 
-> Built for the **DEV.to Gemma 4 Challenge** (May 2026).  
-> This repository is the Day 1–2 validation spike. Feature development
-> (subject tracking, spaced repetition, PWA offline shell) follows in Phases 2–4.
+> Built for the **DEV.to Gemma 4 Challenge** (May 2026).
 
 ---
 

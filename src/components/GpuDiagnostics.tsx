@@ -9,7 +9,6 @@ interface AdapterInfo {
   description: string;
   maxBufferSizeGB: number;
   maxStorageBufferBindingSizeMB: number;
-  subgroupMaxSize: number | null;
 }
 
 type DiagnosticState =
@@ -56,48 +55,42 @@ export function GpuDiagnostics() {
 
   useEffect(() => {
     async function probe() {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nav = navigator as any;
-      if (!nav.gpu) {
-        setState({ phase: "error", message: "navigator.gpu not available — WebGPU unsupported in this browser." });
+      if (!navigator.gpu) {
+        setState({
+          phase: "error",
+          message: "navigator.gpu not available — WebGPU unsupported in this browser.",
+        });
         return;
       }
 
       try {
-        const adapter = await nav.gpu.requestAdapter({ powerPreference: "high-performance" });
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
         if (!adapter) {
-          setState({ phase: "error", message: "No GPU adapter found — hardware acceleration may be disabled." });
+          setState({
+            phase: "error",
+            message: "No GPU adapter found — hardware acceleration may be disabled.",
+          });
           return;
         }
 
-        // Chrome 121+: adapter.info is a sync property.
-        // Older browsers: adapter.requestAdapterInfo() is an async method.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let raw: Record<string, unknown> = {};
-        if ("info" in adapter && adapter.info) {
-          raw = adapter.info as Record<string, unknown>;
-        } else if (typeof adapter.requestAdapterInfo === "function") {
-          try {
-            raw = await adapter.requestAdapterInfo() as Record<string, unknown>;
-          } catch {
-            // ignore — fall through with empty raw
-          }
-        }
-
-        const limits = adapter.limits as Record<string, number | undefined>;
+        // adapter.info is the standard WebGPU 2024+ API (Chrome 121+)
+        const info = adapter.info;
         setState({
           phase: "ok",
           info: {
-            vendor: String(raw.vendor ?? "unknown"),
-            architecture: String(raw.architecture ?? "unknown"),
-            description: String(raw.description ?? "unknown"),
-            maxBufferSizeGB: ((limits.maxBufferSize ?? 0) / 1024 / 1024 / 1024),
-            maxStorageBufferBindingSizeMB: ((limits.maxStorageBufferBindingSize ?? 0) / 1024 / 1024),
-            subgroupMaxSize: limits.subgroupMaxSize ?? null,
+            vendor: info.vendor || "unknown",
+            architecture: info.architecture || "unknown",
+            description: info.description || "unknown",
+            maxBufferSizeGB: adapter.limits.maxBufferSize / 1024 / 1024 / 1024,
+            maxStorageBufferBindingSizeMB:
+              adapter.limits.maxStorageBufferBindingSize / 1024 / 1024,
           },
         });
       } catch (e) {
-        setState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+        setState({
+          phase: "error",
+          message: e instanceof Error ? e.message : String(e),
+        });
       }
     }
 
@@ -164,13 +157,6 @@ export function GpuDiagnostics() {
 
           <span className="text-muted-foreground">Max storage binding</span>
           <span className="font-mono">{info.maxStorageBufferBindingSizeMB.toFixed(0)} MB</span>
-
-          {info.subgroupMaxSize !== null && (
-            <>
-              <span className="text-muted-foreground">Subgroup max size</span>
-              <span className="font-mono">{info.subgroupMaxSize}</span>
-            </>
-          )}
         </div>
 
         <p className="text-xs border-t pt-2 mt-1">

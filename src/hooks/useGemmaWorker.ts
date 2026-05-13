@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use useChatEngine from @/hooks/useChatEngine instead.
+ * Kept only for the /spike legacy validation page.
+ */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";

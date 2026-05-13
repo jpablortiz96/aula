@@ -31,11 +31,12 @@ const nextConfig: NextConfig = {
       layers: true,
     };
 
-    // Prevent server-side bundling of browser-only ONNX/transformers modules
+    // Prevent server-side bundling of browser-only modules
     if (isServer) {
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : []),
         "@huggingface/transformers",
+        "@mediapipe/tasks-genai",
       ];
     }
 
