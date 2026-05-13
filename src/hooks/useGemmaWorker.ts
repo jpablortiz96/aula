@@ -24,6 +24,10 @@ interface UseGemmaWorkerReturn {
   fileProgresses: FileProgress[];
   streamedText: string;
   tokensPerSecond: number | null;
+  /** Time-to-first-token in ms for the last generation */
+  lastTtftMs: number | null;
+  /** Total generation wall-clock time in ms for the last generation */
+  lastTotalMs: number | null;
   error: string | null;
 }
 
@@ -36,12 +40,16 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
   const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const [streamedText, setStreamedText] = useState("");
   const [tokensPerSecond, setTokensPerSecond] = useState<number | null>(null);
+  const [lastTtftMs, setLastTtftMs] = useState<number | null>(null);
+  const [lastTotalMs, setLastTotalMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Track per-file progress for the overall aggregation
   const fileProgressMapRef = useRef<Map<string, { loaded: number; total: number }>>(
     new Map()
   );
+  const generationStartRef = useRef<number | null>(null);
+  const firstTokenTimeRef = useRef<number | null>(null);
+  const tokenCountRef = useRef<number>(0);
 
   useEffect(() => {
     const worker = new Worker(
@@ -55,9 +63,6 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
       switch (msg.type) {
         case "status":
           setStatus(msg.status);
-          if (msg.status !== "generating") {
-            // Reset streamed text when done/ready
-          }
           break;
 
         case "progress": {
@@ -68,7 +73,6 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
             map.set(file, { loaded, total });
           }
 
-          // Compute overall progress across all known files
           let totalLoaded = 0;
           let totalSize = 0;
           map.forEach((v) => {
@@ -80,7 +84,6 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
             setOverallProgress(Math.round((totalLoaded / totalSize) * 100));
           }
 
-          // Build sorted list for display
           setFileProgresses(
             Array.from(map.entries()).map(([f, v]) => ({
               file: f,
@@ -92,13 +95,37 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
           break;
         }
 
-        case "token":
+        case "token": {
+          const now = performance.now();
+          if (firstTokenTimeRef.current === null && generationStartRef.current !== null) {
+            firstTokenTimeRef.current = now;
+          }
+          tokenCountRef.current += 1;
+
+          // Update live tok/s every token
+          if (generationStartRef.current !== null) {
+            const elapsed = (now - generationStartRef.current) / 1000;
+            if (elapsed > 0) {
+              setTokensPerSecond(tokenCountRef.current / elapsed);
+            }
+          }
+
           setStreamedText((prev) => prev + msg.token);
           break;
+        }
 
         case "done":
           setTokensPerSecond(msg.tokensPerSecond);
-          // Commit streamed text to history
+
+          if (generationStartRef.current !== null) {
+            const totalMs = performance.now() - generationStartRef.current;
+            setLastTotalMs(totalMs);
+
+            if (firstTokenTimeRef.current !== null) {
+              setLastTtftMs(firstTokenTimeRef.current - generationStartRef.current);
+            }
+          }
+
           setStreamedText((prev) => {
             if (prev) {
               historyRef.current = [
@@ -140,7 +167,10 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
     setStreamedText("");
     setTokensPerSecond(null);
 
-    // Push user message to history before sending
+    generationStartRef.current = performance.now();
+    firstTokenTimeRef.current = null;
+    tokenCountRef.current = 0;
+
     historyRef.current = [
       ...historyRef.current,
       { role: "user", content: prompt },
@@ -149,7 +179,7 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
     const msg: WorkerInMessage = {
       type: "generate",
       prompt,
-      conversationHistory: historyRef.current.slice(0, -1), // exclude the message we just added
+      conversationHistory: historyRef.current.slice(0, -1),
     };
     workerRef.current.postMessage(msg);
   }, []);
@@ -162,6 +192,8 @@ export function useGemmaWorker(): UseGemmaWorkerReturn {
     fileProgresses,
     streamedText,
     tokensPerSecond,
+    lastTtftMs,
+    lastTotalMs,
     error,
   };
 }

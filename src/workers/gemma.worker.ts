@@ -74,11 +74,21 @@ async function generate(
 
   post({ type: "status", status: "generating" });
 
+  const systemPrompt =
+    "Eres AULA, un tutor educativo para estudiantes latinoamericanos. " +
+    "Responde en español neutro de LATAM, claro y didáctico. " +
+    "Reglas de formato:\n" +
+    "- Usa markdown para estructura: **negritas** para conceptos clave, " +
+    "listas con guiones, encabezados ## solo si la respuesta es larga.\n" +
+    "- Para matemáticas usa LaTeX entre $...$ (inline) o $$...$$ (bloque).\n" +
+    "- Máximo 1-2 emojis por respuesta, solo si aportan claridad.\n" +
+    "- Sé conciso: explica primero la idea, luego ejemplo, luego conclusión.\n" +
+    "- Si el estudiante muestra una operación, resuélvela paso a paso.";
+
   const messages: ChatMessage[] = [
     {
       role: "user" as const,
-      content:
-        "[SYSTEM] Eres AULA, un tutor educativo amigable y paciente. Explica conceptos de forma clara, adaptada al nivel del estudiante. Responde en el idioma del estudiante. [/SYSTEM]",
+      content: `[SYSTEM] ${systemPrompt} [/SYSTEM]`,
     },
     ...conversationHistory,
     { role: "user" as const, content: prompt },

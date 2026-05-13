@@ -1,10 +1,20 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useGemmaWorker } from "@/hooks/useGemmaWorker";
 import { ModelLoader } from "@/components/ModelLoader";
 import { ChatInterface } from "@/components/ChatInterface";
+import { GpuDiagnostics } from "@/components/GpuDiagnostics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+
+const BENCHMARK_PROMPT = "Cuenta del 1 al 50.";
+
+interface BenchmarkResult {
+  tps: number;
+  ttftMs: number;
+  totalMs: number;
+}
 
 export default function SpikePage() {
   const {
@@ -15,8 +25,33 @@ export default function SpikePage() {
     fileProgresses,
     streamedText,
     tokensPerSecond,
+    lastTtftMs,
+    lastTotalMs,
     error,
   } = useGemmaWorker();
+
+  const [benchmarkRunning, setBenchmarkRunning] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
+  const benchmarkPendingRef = useRef(false);
+
+  // Capture benchmark result when generation finishes
+  useEffect(() => {
+    if (benchmarkPendingRef.current && status === "ready" && tokensPerSecond !== null) {
+      benchmarkPendingRef.current = false;
+      setBenchmarkRunning(false);
+      setBenchmarkResult({
+        tps: tokensPerSecond,
+        ttftMs: lastTtftMs ?? 0,
+        totalMs: lastTotalMs ?? 0,
+      });
+    }
+  }, [status, tokensPerSecond, lastTtftMs, lastTotalMs]);
+
+  function handleBenchmark() {
+    setBenchmarkRunning(true);
+    benchmarkPendingRef.current = true;
+    generate(BENCHMARK_PROMPT);
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -40,11 +75,11 @@ export default function SpikePage() {
           </p>
         </div>
 
-        {/* Local indicator (always visible) */}
+        {/* Local indicator */}
         <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2">
           <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
           <span className="text-xs font-semibold text-green-800">
-            🟢 100% LOCAL — Zero server. All computation happens in your browser.
+            100% LOCAL — Zero server. All computation happens in your browser.
           </span>
         </div>
 
@@ -53,6 +88,14 @@ export default function SpikePage() {
           status={status}
           overallProgress={overallProgress}
           onLoad={loadModel}
+        />
+
+        {/* GPU Diagnostics */}
+        <GpuDiagnostics
+          modelStatus={status}
+          onBenchmark={handleBenchmark}
+          benchmarkResult={benchmarkResult}
+          benchmarkRunning={benchmarkRunning}
         />
 
         {/* Per-file progress (shown while loading) */}
@@ -85,7 +128,7 @@ export default function SpikePage() {
           </Card>
         )}
 
-        {/* Chat interface (enabled once model is ready) */}
+        {/* Chat interface */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Chat with Gemma 4 E4B</CardTitle>
@@ -95,6 +138,7 @@ export default function SpikePage() {
               status={status}
               streamedText={streamedText}
               tokensPerSecond={tokensPerSecond}
+              lastTotalMs={lastTotalMs}
               error={error}
               onGenerate={generate}
             />
