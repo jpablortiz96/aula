@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { extractJson } from "@/lib/jsonExtract";
+import { useProgressStore } from "@/store/progressStore";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -170,6 +171,8 @@ export default function TeacherPage() {
   const [quiz,    setQuiz]    = useState<Quiz | null>(null);
   const [error,   setError]   = useState<string | null>(null);
 
+  const recordQuizGenerated = useProgressStore((s) => s.recordQuizGenerated);
+
   async function generate() {
     const apiKey = localStorage.getItem("aula:google-ai-api-key");
     if (!apiKey) {
@@ -198,6 +201,7 @@ export default function TeacherPage() {
       }
 
       setQuiz(quiz);
+      recordQuizGenerated();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -217,12 +221,12 @@ export default function TeacherPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-aula-bg">
       <Header />
 
       <div className="max-w-2xl mx-auto w-full p-4 md:p-6 space-y-4">
         <div>
-          <h1 className="text-xl font-bold">Modo Profesor</h1>
+          <h1 className="text-xl font-heading font-bold text-aula-ink">Modo Profesor</h1>
           <p className="text-sm text-muted-foreground">
             Genera quizzes para tus estudiantes con IA.
           </p>
@@ -286,7 +290,7 @@ export default function TeacherPage() {
             <Button
               onClick={() => { void generate(); }}
               disabled={loading || !topic.trim()}
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white"
             >
               {loading
                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando…</>

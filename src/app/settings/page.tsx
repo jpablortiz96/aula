@@ -104,14 +104,14 @@ export default function SettingsPage() {
     localPreferCloud !== preferCloud;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-aula-bg p-4 md:p-8">
       <div className="max-w-xl mx-auto space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight">Settings</h1>
-          <div className="flex gap-3 text-xs text-muted-foreground">
-            <Link href="/chat" className="hover:underline">← Chat</Link>
-            <Link href="/" className="hover:underline">Home</Link>
+          <h1 className="text-xl font-heading font-bold text-aula-ink tracking-tight">Configuración</h1>
+          <div className="flex gap-3 text-xs text-aula-ink-soft">
+            <Link href="/chat" className="hover:text-aula-ink hover:underline">← Chat</Link>
+            <Link href="/" className="hover:text-aula-ink hover:underline">Inicio</Link>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export default function SettingsPage() {
                   key={opt.id}
                   className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     localEngine === opt.id
-                      ? "border-green-400 bg-green-50"
+                      ? "border-aula-blue bg-blue-50"
                       : "border-gray-200 hover:bg-gray-50"
                   }`}
                 >
@@ -173,7 +173,7 @@ export default function SettingsPage() {
                     onChange={(e) => setLocalKey(e.target.value)}
                     placeholder="AIza…"
                     autoComplete="off"
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-400"
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-aula-blue"
                   />
                   <Button
                     size="sm"
@@ -212,7 +212,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSave}
               disabled={!hasChanges && saveState !== "saved"}
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white"
               size="sm"
             >
               {saveState === "saved" ? "Guardado ✓" : "Guardar"}
@@ -222,7 +222,7 @@ export default function SettingsPage() {
 
         {/* Hardware Diagnostics */}
         <div className="space-y-1.5">
-          <h2 className="text-sm font-semibold text-gray-700">Hardware Diagnostics</h2>
+          <h2 className="text-sm font-heading font-semibold text-aula-ink">Diagnóstico de hardware</h2>
           <GpuDiagnostics />
           <RamInfo />
         </div>
