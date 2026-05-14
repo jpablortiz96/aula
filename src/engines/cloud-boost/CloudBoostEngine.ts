@@ -146,7 +146,7 @@ export class CloudBoostEngine implements ChatEngine {
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
-        maxOutputTokens: opts.maxTokens ?? 800,
+        maxOutputTokens: opts.maxTokens ?? 2048,
         temperature: opts.temperature ?? 0.7,
         thinkingConfig: { thinkingBudget: 0 },
       },
@@ -201,7 +201,7 @@ export class CloudBoostEngine implements ChatEngine {
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
-        maxOutputTokens: opts.maxTokens ?? 800,
+        maxOutputTokens: opts.maxTokens ?? 2048,
         temperature: opts.temperature ?? 0.7,
         // thinkingConfig omitted — not supported by this model/version
       },

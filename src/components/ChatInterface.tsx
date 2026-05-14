@@ -125,6 +125,7 @@ export function ChatInterface({
 
   const showStream = isGenerating && streamedText;
   const showPending = isGenerating && pendingUserMsg;
+  const showThinking = isGenerating && !streamedText;
 
   return (
     <div className="flex flex-col gap-3">
@@ -170,6 +171,17 @@ export function ChatInterface({
         {showPending && (
           <div className="flex justify-end">
             <UserBubble content={pendingUserMsg!} />
+          </div>
+        )}
+
+        {/* Thinking indicator — visible before first token arrives */}
+        {showThinking && (
+          <div className="flex justify-start">
+            <div className="rounded-xl px-4 py-3 bg-gray-100 text-gray-400 flex items-center gap-1.5">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
           </div>
         )}
 

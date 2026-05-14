@@ -124,7 +124,7 @@ export function useChatEngine(): UseChatEngineReturn {
 
     void engineRef.current
       .generate(messages, {
-        maxTokens: 512,
+        maxTokens: 2048,
         temperature: 0.7,
         onToken: (token) => {
           const now = performance.now();
