@@ -93,35 +93,58 @@ function validateQuiz(parsed: unknown): Quiz {
   };
 }
 
+type GeminiPart = { text?: string; thought?: boolean };
 type GeminiResponse = {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
+  error?: { message?: string; code?: number };
 };
 
 async function callGemini(
   apiKey: string,
   userPrompt: string,
-  count: number
+  count: number,
+  suppressThinking = true,
 ): Promise<string> {
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens: Math.max(1024, count * 350),
+    temperature: 0.3,
+  };
+  if (suppressThinking) {
+    generationConfig["thinkingConfig"] = { thinkingBudget: 0 };
+  }
+
   const res = await fetch(`${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        maxOutputTokens: Math.max(1024, count * 300),
-        temperature: 0.3,
-      },
+      generationConfig,
     }),
   });
 
+  // thinkingConfig may not be supported — retry without it
+  if (res.status === 400 && suppressThinking) {
+    const body = (await res.json().catch(() => ({}))) as GeminiResponse;
+    const msg = body.error?.message ?? "";
+    if (msg.toLowerCase().includes("thinking")) {
+      return callGemini(apiKey, userPrompt, count, false);
+    }
+    throw new Error(msg || "HTTP 400");
+  }
+
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    const body = (await res.json().catch(() => ({}))) as GeminiResponse;
     throw new Error(body.error?.message ?? `HTTP ${res.status}`);
   }
 
   const data = (await res.json()) as GeminiResponse;
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  // Filter out thinking tokens (thought: true) before joining text
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+  return parts
+    .filter((p) => p.thought !== true)
+    .map((p) => p.text ?? "")
+    .join("");
 }
 
 function toMarkdown(quiz: Quiz): string {
@@ -163,41 +186,20 @@ export default function TeacherPage() {
 
     try {
       // First attempt
-      let raw: string;
+      let raw = await callGemini(apiKey, buildUserPrompt(topicTrimmed, grade, count, type), count);
+
+      let quiz: Quiz | null = null;
       try {
-        raw = await callGemini(apiKey, buildUserPrompt(topicTrimmed, grade, count, type), count);
-      } catch (err) {
-        throw err;
+        quiz = validateQuiz(extractJson(raw));
+      } catch {
+        // First parse failed — retry with more explicit prompt
+        raw = await callGemini(apiKey, buildRetryPrompt(topicTrimmed, grade, count, type), count);
+        quiz = validateQuiz(extractJson(raw));
       }
 
-      let parsed: unknown;
-      let parseError: Error | null = null;
-
-      try {
-        parsed = extractJson(raw);
-      } catch (e) {
-        parseError = e instanceof Error ? e : new Error(String(e));
-      }
-
-      // Retry once if parse failed or structure is invalid
-      if (parseError !== null || !parsed) {
-        raw = await callGemini(
-          apiKey,
-          buildRetryPrompt(topicTrimmed, grade, count, type),
-          count
-        );
-        parsed = extractJson(raw); // let it throw if still bad
-      }
-
-      const validated = validateQuiz(parsed);
-      setQuiz(validated);
+      setQuiz(quiz);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(
-        msg.includes("parsear") || msg.includes("JSON")
-          ? "No pude generar el quiz. Intenta con un tema más específico."
-          : msg
-      );
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
