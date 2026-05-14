@@ -23,6 +23,7 @@ export default function ChatPage() {
     lastTtftMs,
     lastTotalMs,
     error,
+    usingCloudForImage,
     load,
     generate,
     abort,
@@ -37,7 +38,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header resolvedEngineId={resolvedEngineId} />
+      <Header resolvedEngineId={resolvedEngineId} cloudForImage={usingCloudForImage} />
 
       <div className="flex flex-1 overflow-hidden">
         <SessionSidebar {...session} className="h-full overflow-hidden" />

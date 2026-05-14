@@ -19,25 +19,46 @@ const SYSTEM_PROMPT =
   "4. Cierre con la respuesta final en **negrita**.\n\n" +
   "REGLAS: Español neutro latinoamericano. Máximo 200 palabras. ≤2 emojis.";
 
-/** Format messages as a Gemma instruction-tuned prompt string. */
+/**
+ * Format messages as a Gemma instruction-tuned prompt.
+ * System content is injected into the first user turn — Gemma does not
+ * recognise [SYSTEM] tags and will echo them back in the response.
+ */
 function formatPrompt(messages: ChatMessage[]): string {
-  const lines: string[] = [`<start_of_turn>user\n[SYSTEM] ${SYSTEM_PROMPT} [/SYSTEM]<end_of_turn>`];
+  const systemMsg = messages.find((m) => m.role === "system");
+  const chatMsgs  = messages.filter((m) => m.role !== "system");
+  const firstUserIdx = chatMsgs.findIndex((m) => m.role === "user");
 
-  for (const msg of messages) {
-    if (msg.role === "system") continue;
-    const tag = msg.role === "user" ? "user" : "model";
-    lines.push(`<start_of_turn>${tag}\n${msg.content}<end_of_turn>`);
-  }
+  let prompt = "";
+  chatMsgs.forEach((m, i) => {
+    if (m.role === "user") {
+      const content =
+        i === firstUserIdx && systemMsg
+          ? `${systemMsg.content}\n\n${m.content}`
+          : m.content;
+      prompt += `<start_of_turn>user\n${content}<end_of_turn>\n`;
+    } else if (m.role === "assistant") {
+      prompt += `<start_of_turn>model\n${m.content}<end_of_turn>\n`;
+    }
+  });
 
-  lines.push("<start_of_turn>model\n");
-  return lines.join("\n");
+  prompt += "<start_of_turn>model\n";
+  return prompt;
+}
+
+/** Strip control tokens the model may emit verbatim. */
+function stripControlTokens(text: string): string {
+  return text
+    .replace(/<end_of_turn>/g, "")
+    .replace(/<start_of_turn>(model|user)\n?/g, "")
+    .trim();
 }
 
 export class MediaPipeEngine implements ChatEngine {
   readonly id: EngineId = "mediapipe";
   readonly displayName = "MediaPipe (Local — Gemma 4 E2B)";
   readonly capabilities: EngineCapabilities = {
-    supportsMultimodal: true,
+    supportsMultimodal: false, // Gemma 4 E2B .task is text-only; vision requires Gemma 3n
     supportsStreaming: true,
     requiresApiKey: false,
     runsLocally: true,
@@ -132,8 +153,8 @@ export class MediaPipeEngine implements ChatEngine {
         opts.onToken?.(partial);
       })
       .then(() => {
-        this.abortResolve = null; // natural completion — no abort pending
-        return this.currentAccumulated;
+        this.abortResolve = null;
+        return stripControlTokens(this.currentAccumulated);
       });
 
     return Promise.race([generatePromise, abortPromise]);

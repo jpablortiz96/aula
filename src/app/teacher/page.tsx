@@ -6,6 +6,12 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { extractJson } from "@/lib/jsonExtract";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const MODEL    = "gemma-4-26b-a4b-it";
 
 const GRADE_OPTIONS = ["6°", "7°", "8°", "9°", "10°", "11°"];
 const COUNT_OPTIONS = [3, 5, 7, 10];
@@ -16,6 +22,8 @@ const TYPE_OPTIONS = [
 ] as const;
 
 type QuizType = typeof TYPE_OPTIONS[number]["value"];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface QuizQuestion {
   question:     string;
@@ -29,31 +37,95 @@ interface Quiz {
   questions: QuizQuestion[];
 }
 
-function buildPrompt(topic: string, grade: string, count: number, type: QuizType): string {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const SYSTEM_INSTRUCTION =
+  "Eres un generador de quizzes educativos. " +
+  "Respondes EXCLUSIVAMENTE con un objeto JSON válido. " +
+  "NUNCA incluyas texto antes o después del JSON. " +
+  "NUNCA uses markdown ni backticks. " +
+  "Usa SIEMPRE comillas dobles para claves y valores. " +
+  "Escapa las comillas internas con \\\\\" (backslash-quote). " +
+  "Estructura exacta:\n" +
+  '{"topic":"string","grade":"string","questions":[{"question":"string","options":["A) string","B) string","C) string","D) string"],"answer":"A","explanation":"string"}]}\n' +
+  "Para preguntas abiertas omite el campo \"options\" y pon la respuesta completa en \"answer\".";
+
+function buildUserPrompt(topic: string, grade: string, count: number, type: QuizType): string {
   const typeDesc =
     type === "multiple_choice" ? "selección múltiple (4 opciones A-D)"
-    : type === "open"          ? "preguntas abiertas con respuesta esperada"
+    : type === "open"          ? "preguntas abiertas"
     :                            "mixto (mitad selección múltiple, mitad abiertas)";
 
   return (
-    `Crea un quiz de ${count} preguntas sobre "${topic}" para estudiantes de ${grade} de secundaria en Latinoamérica.\n` +
-    `Tipo: ${typeDesc}.\n` +
-    `Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto extra) usando este esquema:\n` +
-    `{"topic":"...","grade":"...","questions":[{"question":"...","options":["A) ...","B) ...","C) ...","D) ..."],"answer":"A","explanation":"..."}]}\n` +
-    `Para preguntas abiertas omite el campo "options". El campo "answer" en preguntas abiertas es la respuesta completa esperada.`
+    `Crea ${count} preguntas de ${typeDesc} sobre "${topic}" ` +
+    `para estudiantes de ${grade} de secundaria en Latinoamérica. ` +
+    `Responde solo el JSON, comenzando con { y terminando con }.`
   );
 }
 
-function stripFences(raw: string): string {
-  return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+function buildRetryPrompt(topic: string, grade: string, count: number, type: QuizType): string {
+  return (
+    `Tu respuesta anterior no fue JSON válido. ` +
+    buildUserPrompt(topic, grade, count, type) +
+    ` No escribas nada antes de { ni después de }.`
+  );
+}
+
+function validateQuiz(parsed: unknown): Quiz {
+  const obj = parsed as Record<string, unknown>;
+  if (!obj || typeof obj !== "object") throw new Error("Respuesta no es un objeto JSON.");
+  if (!Array.isArray(obj["questions"]) || (obj["questions"] as unknown[]).length === 0) {
+    throw new Error("El quiz no tiene preguntas.");
+  }
+  const questions = obj["questions"] as Record<string, unknown>[];
+  for (const q of questions) {
+    if (typeof q["question"] !== "string" || !q["question"]) {
+      throw new Error("Una pregunta no tiene texto.");
+    }
+    if (typeof q["answer"] !== "string" || !q["answer"]) {
+      throw new Error("Una pregunta no tiene respuesta.");
+    }
+  }
+  return {
+    topic:     typeof obj["topic"] === "string" ? obj["topic"] : "",
+    grade:     typeof obj["grade"] === "string" ? obj["grade"] : "",
+    questions: questions as unknown as QuizQuestion[],
+  };
+}
+
+type GeminiResponse = {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+};
+
+async function callGemini(
+  apiKey: string,
+  userPrompt: string,
+  count: number
+): Promise<string> {
+  const res = await fetch(`${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        maxOutputTokens: Math.max(1024, count * 300),
+        temperature: 0.3,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as GeminiResponse;
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
 function toMarkdown(quiz: Quiz): string {
-  const lines: string[] = [
-    `# Quiz: ${quiz.topic}`,
-    `**Grado:** ${quiz.grade}`,
-    "",
-  ];
+  const lines: string[] = [`# Quiz: ${quiz.topic}`, `**Grado:** ${quiz.grade}`, ""];
   quiz.questions.forEach((q, i) => {
     lines.push(`## ${i + 1}. ${q.question}`);
     if (q.options) q.options.forEach((o) => lines.push(`- ${o}`));
@@ -64,8 +136,7 @@ function toMarkdown(quiz: Quiz): string {
   return lines.join("\n");
 }
 
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL    = "gemma-4-26b-a4b-it";
+// ─── Page component ───────────────────────────────────────────────────────────
 
 export default function TeacherPage() {
   const [topic,   setTopic]   = useState("");
@@ -88,34 +159,45 @@ export default function TeacherPage() {
     setError(null);
     setQuiz(null);
 
-    try {
-      const prompt = buildPrompt(topic.trim(), grade, count, type);
-      const res = await fetch(
-        `${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 2048, temperature: 0.4 },
-          }),
-        }
-      );
+    const topicTrimmed = topic.trim();
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+    try {
+      // First attempt
+      let raw: string;
+      try {
+        raw = await callGemini(apiKey, buildUserPrompt(topicTrimmed, grade, count, type), count);
+      } catch (err) {
+        throw err;
       }
 
-      const data = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      const raw     = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      const cleaned = stripFences(raw);
-      const parsed  = JSON.parse(cleaned) as Quiz;
-      setQuiz(parsed);
+      let parsed: unknown;
+      let parseError: Error | null = null;
+
+      try {
+        parsed = extractJson(raw);
+      } catch (e) {
+        parseError = e instanceof Error ? e : new Error(String(e));
+      }
+
+      // Retry once if parse failed or structure is invalid
+      if (parseError !== null || !parsed) {
+        raw = await callGemini(
+          apiKey,
+          buildRetryPrompt(topicTrimmed, grade, count, type),
+          count
+        );
+        parsed = extractJson(raw); // let it throw if still bad
+      }
+
+      const validated = validateQuiz(parsed);
+      setQuiz(validated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(
+        msg.includes("parsear") || msg.includes("JSON")
+          ? "No pude generar el quiz. Intenta con un tema más específico."
+          : msg
+      );
     } finally {
       setLoading(false);
     }
@@ -193,7 +275,11 @@ export default function TeacherPage() {
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+                {error}
+              </p>
+            )}
 
             <Button
               onClick={() => { void generate(); }}
@@ -230,7 +316,9 @@ export default function TeacherPage() {
                       ))}
                     </ul>
                   )}
-                  <p className="text-xs font-semibold text-green-700">Respuesta: {q.answer}</p>
+                  <p className="text-xs font-semibold text-green-700">
+                    Respuesta: {q.answer}
+                  </p>
                   {q.explanation && (
                     <p className="text-xs text-gray-500 italic">{q.explanation}</p>
                   )}

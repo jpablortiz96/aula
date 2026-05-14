@@ -29,6 +29,7 @@ export interface UseChatEngineReturn {
   lastTtftMs: number | null;
   lastTotalMs: number | null;
   error: string | null;
+  usingCloudForImage: boolean;
   load: () => void;
   generate: (prompt: string, images?: string[]) => void;
   abort: () => void;
@@ -58,6 +59,7 @@ export function useChatEngine(): UseChatEngineReturn {
   const [lastTtftMs, setLastTtftMs] = useState<number | null>(null);
   const [lastTotalMs, setLastTotalMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usingCloudForImage, setUsingCloudForImage] = useState(false);
 
   const generationStartRef = useRef<number | null>(null);
   const firstTokenTimeRef = useRef<number | null>(null);
@@ -101,6 +103,24 @@ export function useChatEngine(): UseChatEngineReturn {
   const generate = useCallback((prompt: string, images?: string[]) => {
     if (!engineRef.current || status !== "ready") return;
 
+    const hasImages = (images?.length ?? 0) > 0;
+    const needsCloudFallback = hasImages && !engineRef.current.capabilities.supportsMultimodal;
+
+    // Images need cloud — check for API key before doing anything visible
+    if (needsCloudFallback) {
+      const apiKey =
+        typeof window !== "undefined"
+          ? localStorage.getItem("aula:google-ai-api-key")
+          : null;
+      if (!apiKey) {
+        useChatStore.getState().addMessage(
+          "system-notice",
+          "📷 Para analizar imágenes, AULA usa Gemma 4 en la nube. Agrega tu API key gratuita en Ajustes."
+        );
+        return;
+      }
+    }
+
     setError(null);
     setStreamedText("");
     setTokensPerSecond(null);
@@ -110,11 +130,10 @@ export function useChatEngine(): UseChatEngineReturn {
     firstTokenTimeRef.current = null;
     tokenCountRef.current = 0;
 
-    // Fall back to CloudBoost for multimodal when the active engine can't handle images
-    const needsCloudFallback =
-      (images?.length ?? 0) > 0 && !engineRef.current.capabilities.supportsMultimodal;
     const genEngine: ChatEngine = needsCloudFallback ? new CloudBoostEngine() : engineRef.current;
     activeGenRef.current = genEngine;
+
+    if (needsCloudFallback) setUsingCloudForImage(true);
 
     // Build history from the persistent chat store (user + assistant only)
     const history: ChatMessage[] = useChatStore.getState().messages
@@ -168,6 +187,7 @@ export function useChatEngine(): UseChatEngineReturn {
         if (full) store.addMessage("assistant", full);
 
         activeGenRef.current = null;
+        setUsingCloudForImage(false);
         setPendingUserMsg(null);
         setStreamedText("");
         setStatus("ready");
@@ -175,6 +195,7 @@ export function useChatEngine(): UseChatEngineReturn {
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         activeGenRef.current = null;
+        setUsingCloudForImage(false);
         setError(msg);
         setPendingUserMsg(null);
         setStreamedText("");
@@ -224,6 +245,7 @@ export function useChatEngine(): UseChatEngineReturn {
     lastTtftMs,
     lastTotalMs,
     error,
+    usingCloudForImage,
     load: triggerLoad,
     generate,
     abort,

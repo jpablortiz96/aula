@@ -7,9 +7,10 @@ import type { EngineId } from "@/engines/types";
 
 interface HeaderProps {
   resolvedEngineId?: EngineId | null;
+  cloudForImage?: boolean;
 }
 
-export function Header({ resolvedEngineId }: HeaderProps) {
+export function Header({ resolvedEngineId, cloudForImage }: HeaderProps) {
   const pathname = usePathname();
 
   const navLink = (href: string, label: string) => (
@@ -31,7 +32,7 @@ export function Header({ resolvedEngineId }: HeaderProps) {
         </Link>
         {resolvedEngineId && (
           <span className="text-[11px] font-mono bg-gray-100 border px-1.5 py-0.5 rounded text-gray-500">
-            {ENGINE_DISPLAY[resolvedEngineId]}
+            {cloudForImage ? "Cloud Boost · imagen" : ENGINE_DISPLAY[resolvedEngineId]}
           </span>
         )}
       </div>
