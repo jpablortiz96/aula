@@ -30,7 +30,7 @@ export interface UseChatEngineReturn {
   lastTotalMs: number | null;
   error: string | null;
   load: () => void;
-  generate: (prompt: string) => void;
+  generate: (prompt: string, images?: string[]) => void;
   abort: () => void;
   switchEngine: (id: EngineId | "auto") => void;
 }
@@ -62,6 +62,7 @@ export function useChatEngine(): UseChatEngineReturn {
   const generationStartRef = useRef<number | null>(null);
   const firstTokenTimeRef = useRef<number | null>(null);
   const tokenCountRef = useRef(0);
+  const activeGenRef = useRef<ChatEngine | null>(null);
 
   const resolveEngine = useCallback(async (): Promise<EngineId> => {
     if (selectedEngineId !== "auto") return selectedEngineId;
@@ -97,7 +98,7 @@ export function useChatEngine(): UseChatEngineReturn {
   loadRef.current = load;
   const triggerLoad = useCallback(() => { void loadRef.current(); }, []);
 
-  const generate = useCallback((prompt: string) => {
+  const generate = useCallback((prompt: string, images?: string[]) => {
     if (!engineRef.current || status !== "ready") return;
 
     setError(null);
@@ -109,6 +110,12 @@ export function useChatEngine(): UseChatEngineReturn {
     firstTokenTimeRef.current = null;
     tokenCountRef.current = 0;
 
+    // Fall back to CloudBoost for multimodal when the active engine can't handle images
+    const needsCloudFallback =
+      (images?.length ?? 0) > 0 && !engineRef.current.capabilities.supportsMultimodal;
+    const genEngine: ChatEngine = needsCloudFallback ? new CloudBoostEngine() : engineRef.current;
+    activeGenRef.current = genEngine;
+
     // Build history from the persistent chat store (user + assistant only)
     const history: ChatMessage[] = useChatStore.getState().messages
       .filter((m) => m.role === "user" || m.role === "assistant")
@@ -117,12 +124,12 @@ export function useChatEngine(): UseChatEngineReturn {
     const messages: ChatMessage[] = [
       SYSTEM_MESSAGE,
       ...history,
-      { role: "user", content: prompt },
+      { role: "user", content: prompt, images: images?.length ? images : undefined },
     ];
 
     setStatus("generating");
 
-    void engineRef.current
+    void genEngine
       .generate(messages, {
         maxTokens: 2048,
         temperature: 0.7,
@@ -160,12 +167,14 @@ export function useChatEngine(): UseChatEngineReturn {
         store.addMessage("user", prompt);
         if (full) store.addMessage("assistant", full);
 
+        activeGenRef.current = null;
         setPendingUserMsg(null);
         setStreamedText("");
         setStatus("ready");
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
+        activeGenRef.current = null;
         setError(msg);
         setPendingUserMsg(null);
         setStreamedText("");
@@ -174,7 +183,7 @@ export function useChatEngine(): UseChatEngineReturn {
   }, [status]);
 
   const abort = useCallback(() => {
-    engineRef.current?.abort();
+    activeGenRef.current?.abort();
   }, []);
 
   const switchEngine = useCallback((id: EngineId | "auto") => {

@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type DisplayRole = "user" | "assistant" | "system-notice";
 
@@ -12,22 +11,19 @@ export interface DisplayMessage {
 interface ChatStore {
   messages: DisplayMessage[];
   addMessage: (role: DisplayRole, content: string) => void;
+  setMessages: (messages: DisplayMessage[]) => void;
   clearHistory: () => void;
 }
 
-export const useChatStore = create<ChatStore>()(
-  persist(
-    (set) => ({
-      messages: [],
-      addMessage: (role, content) =>
-        set((state) => ({
-          messages: [
-            ...state.messages,
-            { id: crypto.randomUUID(), role, content },
-          ],
-        })),
-      clearHistory: () => set({ messages: [] }),
-    }),
-    { name: "aula:chat-history" }
-  )
-);
+export const useChatStore = create<ChatStore>()((set) => ({
+  messages: [],
+  addMessage: (role, content) =>
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        { id: crypto.randomUUID(), role, content },
+      ],
+    })),
+  setMessages: (messages) => set({ messages }),
+  clearHistory: () => set({ messages: [] }),
+}));
