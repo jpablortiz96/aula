@@ -1,43 +1,55 @@
+"use client";
+
 import Link from "next/link";
 import { AulaLogo } from "@/components/AulaLogo";
-
-const FEATURES = [
-  { icon: "📸", title: "Aprende desde fotos", desc: "Sube una imagen de tu tarea y AULA te explica paso a paso." },
-  { icon: "🎤", title: "Voz bidireccional",   desc: "Dicta tu pregunta y escucha la respuesta — sin escribir." },
-  { icon: "📚", title: "Sesiones guardadas",  desc: "Todas tus conversaciones quedan en tu dispositivo, sin servidor." },
-  { icon: "👩‍🏫", title: "Modo Profesor",       desc: "Genera quizzes listos para imprimir en segundos." },
-];
-
-const PILLARS = [
-  { emoji: "🌐", label: "Sin internet",  sub: "después del primer uso" },
-  { emoji: "🔒", label: "Sin cuenta",    sub: "nunca te pedimos datos" },
-  { emoji: "⚡", label: "Sin servidor",  sub: "corre en tu navegador"  },
-];
+import { useT } from "@/hooks/useT";
+import { useI18nStore } from "@/store/i18nStore";
 
 export default function Home() {
+  const t    = useT();
+  const lang = useI18nStore((s) => s.lang);
+  const setLang = useI18nStore((s) => s.setLang);
+
+  const FEATURES = [
+    { icon: "📸", titleKey: "landing.feature.photos.title",   descKey: "landing.feature.photos.desc" },
+    { icon: "🎤", titleKey: "landing.feature.voice.title",    descKey: "landing.feature.voice.desc" },
+    { icon: "📚", titleKey: "landing.feature.sessions.title", descKey: "landing.feature.sessions.desc" },
+    { icon: "👩‍🏫", titleKey: "landing.feature.teacher.title", descKey: "landing.feature.teacher.desc" },
+  ];
+
+  const PILLARS = [
+    { emoji: "🌐", labelKey: "landing.pillar.noInternet",   subKey: "landing.pillar.noInternet.sub" },
+    { emoji: "🔒", labelKey: "landing.pillar.noAccount",    subKey: "landing.pillar.noAccount.sub" },
+    { emoji: "⚡", labelKey: "landing.pillar.noServer",     subKey: "landing.pillar.noServer.sub" },
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-aula-bg">
-      {/* ── Nav strip ────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b">
         <AulaLogo size="md" />
         <nav className="flex items-center gap-4 text-sm font-medium text-aula-ink-soft">
-          <Link href="/teacher" className="hover:text-aula-ink transition-colors">Profesor</Link>
-          <Link href="/logros"  className="hover:text-aula-ink transition-colors">Logros</Link>
-          <Link href="/settings" className="hover:text-aula-ink transition-colors">Config</Link>
+          <Link href="/teacher" className="hover:text-aula-ink transition-colors">{t("nav.teacher")}</Link>
+          <Link href="/logros"  className="hover:text-aula-ink transition-colors">{t("nav.logros")}</Link>
+          <Link href="/settings" className="hover:text-aula-ink transition-colors">{t("nav.settings")}</Link>
+          <button
+            onClick={() => setLang(lang === "es" ? "en" : "es")}
+            className="text-xs font-bold px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            aria-label="Switch language"
+          >
+            {lang === "es" ? "EN" : "ES"}
+          </button>
         </nav>
       </header>
 
       <main className="flex-1 flex flex-col items-center">
-        {/* ── Hero ─────────────────────────────────────────────── */}
         <section className="w-full max-w-2xl px-6 pt-16 pb-10 text-center space-y-6">
           <div className="space-y-3">
             <AulaLogo size="lg" />
             <h2 className="text-2xl md:text-3xl font-heading font-bold text-aula-ink leading-snug">
-              Tu tutor de IA<br className="hidden sm:block" /> que vive en tu navegador
+              {t("landing.tagline")}
             </h2>
             <p className="text-aula-ink-soft text-base max-w-md mx-auto">
-              Potenciado por Gemma 4, completamente offline después del primer uso.
-              Sin cuenta, sin servidor, sin datos enviados a ningún lado.
+              {t("landing.subtitle")}
             </p>
           </div>
 
@@ -45,41 +57,36 @@ export default function Home() {
             href="/chat"
             className="inline-flex items-center gap-2 rounded-full bg-aula-blue px-8 py-3.5 text-white font-semibold text-base hover:bg-aula-blue-dark transition-colors shadow-md shadow-blue-200 focus-visible:outline-2 focus-visible:outline-aula-blue"
           >
-            Comenzar a estudiar →
+            {t("landing.cta")}
           </Link>
 
-          {/* Pillars */}
           <div className="flex items-center justify-center gap-6 flex-wrap pt-2">
             {PILLARS.map((p) => (
-              <div key={p.label} className="flex items-center gap-1.5 text-sm text-aula-ink-soft">
+              <div key={p.labelKey} className="flex items-center gap-1.5 text-sm text-aula-ink-soft">
                 <span>{p.emoji}</span>
-                <span className="font-semibold text-aula-ink">{p.label}</span>
-                <span className="hidden sm:inline">— {p.sub}</span>
+                <span className="font-semibold text-aula-ink">{t(p.labelKey)}</span>
+                <span className="hidden sm:inline">— {t(p.subKey)}</span>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── Feature cards ──────────────────────────────────────── */}
-        <section
-          className="w-full max-w-2xl px-6 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-4"
-          aria-label="Funcionalidades"
-        >
+        <section className="w-full max-w-2xl px-6 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {FEATURES.map((f) => (
             <div
-              key={f.title}
+              key={f.titleKey}
               className="bg-white rounded-2xl border border-gray-100 p-5 space-y-2 shadow-sm hover:shadow-md transition-shadow"
             >
               <span className="text-3xl">{f.icon}</span>
-              <p className="font-heading font-bold text-aula-ink">{f.title}</p>
-              <p className="text-sm text-aula-ink-soft leading-relaxed">{f.desc}</p>
+              <p className="font-heading font-bold text-aula-ink">{t(f.titleKey)}</p>
+              <p className="text-sm text-aula-ink-soft leading-relaxed">{t(f.descKey)}</p>
             </div>
           ))}
         </section>
       </main>
 
       <footer className="text-center text-xs text-aula-ink-soft py-4 border-t bg-white">
-        Built for the DEV.to Gemma 4 Challenge · Mayo 2026
+        {t("landing.footer")}
       </footer>
     </div>
   );

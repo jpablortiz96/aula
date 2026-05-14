@@ -6,40 +6,35 @@ import { clearEngineCache } from "@/engines/EngineRegistry";
 import { GpuDiagnostics } from "@/components/GpuDiagnostics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useI18nStore, type Lang } from "@/store/i18nStore";
+import { useChatSettingsStore } from "@/store/chatSettingsStore";
+import { useT } from "@/hooks/useT";
 import Link from "next/link";
 
-const ENGINE_OPTIONS: { id: EngineSelection; label: string; description: string }[] = [
-  {
-    id: "auto",
-    label: "Auto (recomendado)",
-    description: "AULA detecta el mejor engine según tu hardware.",
-  },
-  {
-    id: "mediapipe",
-    label: "Local — MediaPipe (Gemma 4 E2B)",
-    description: "100% offline después del primer download. Requiere WebGPU.",
-  },
-  {
-    id: "cloud-boost",
-    label: "Cloud — Gemma 4 26B via AI Studio",
-    description: "Mayor calidad de respuestas. Requiere API key de Google.",
-  },
-];
-
-type SaveState = "idle" | "saved" | "error";
+type SaveState = "idle" | "saved";
 
 export default function SettingsPage() {
+  const t = useT();
+
   const { selectedEngineId, apiKey, preferCloud, setEngine, setApiKey, setPreferCloud } =
     useEngineStore();
+  const { lang, setLang }      = useI18nStore();
+  const { socraticMode, setSocraticMode } = useChatSettingsStore();
 
-  const [localEngine, setLocalEngine] = useState<EngineSelection>(selectedEngineId);
-  const [localKey, setLocalKey] = useState(apiKey);
+  const [localEngine,      setLocalEngine]      = useState<EngineSelection>(selectedEngineId);
+  const [localKey,         setLocalKey]         = useState(apiKey);
   const [localPreferCloud, setLocalPreferCloud] = useState(preferCloud);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "fail">("idle");
-  const [testMsg, setTestMsg] = useState("");
+  const [saveState,        setSaveState]        = useState<SaveState>("idle");
+  const [testState,        setTestState]        = useState<"idle" | "testing" | "ok" | "fail">("idle");
+  const [testMsg,          setTestMsg]          = useState("");
 
   const needsKey = localEngine === "cloud-boost" || localEngine === "auto";
+
+  const ENGINE_OPTIONS: { id: EngineSelection; label: string; description: string }[] = [
+    { id: "auto",        label: "Auto (recomendado)", description: "AULA detecta el mejor engine según tu hardware." },
+    { id: "mediapipe",   label: "Local — MediaPipe (Gemma 4 E2B)", description: "100% offline después del primer download. Requiere WebGPU." },
+    { id: "cloud-boost", label: "Cloud — Gemma 4 26B via AI Studio", description: "Mayor calidad de respuestas. Requiere API key de Google." },
+  ];
 
   function handleSave() {
     setEngine(localEngine);
@@ -51,12 +46,7 @@ export default function SettingsPage() {
   }
 
   async function handleTest() {
-    if (!localKey.trim()) {
-      setTestMsg("Ingresa una API key para probar.");
-      setTestState("fail");
-      return;
-    }
-
+    if (!localKey.trim()) { setTestMsg(t("settings.engine.testFail.empty")); setTestState("fail"); return; }
     setTestState("testing");
     setTestMsg("");
 
@@ -72,60 +62,98 @@ export default function SettingsPage() {
           }),
         }
       );
-
-      if (res.status === 401) {
-        setTestMsg("API key inválida.");
-        setTestState("fail");
-        return;
-      }
-      if (res.status === 404) {
-        // Model might not exist yet; key is valid
-        setTestMsg("Key válida (modelo gemma-4-26b-a4b-it en preview — disponible próximamente).");
-        setTestState("ok");
-        return;
-      }
-      if (!res.ok) {
-        setTestMsg(`Error HTTP ${res.status}.`);
-        setTestState("fail");
-        return;
-      }
-
-      setTestMsg("Conexión exitosa — API key válida.");
+      if (res.status === 401) { setTestMsg(t("settings.engine.testFail.invalid")); setTestState("fail"); return; }
+      if (res.status === 404) { setTestMsg(t("settings.engine.testOk.preview")); setTestState("ok"); return; }
+      if (!res.ok) { setTestMsg(`HTTP ${res.status}`); setTestState("fail"); return; }
+      setTestMsg(t("settings.engine.testOk"));
       setTestState("ok");
     } catch {
-      setTestMsg("Error de red al conectar con Google AI Studio.");
+      setTestMsg(t("settings.engine.testFail.network"));
       setTestState("fail");
     }
   }
 
-  const hasChanges =
-    localEngine !== selectedEngineId ||
-    localKey !== apiKey ||
-    localPreferCloud !== preferCloud;
+  const hasChanges = localEngine !== selectedEngineId || localKey !== apiKey || localPreferCloud !== preferCloud;
+
+  const LANG_OPTIONS: { value: Lang; label: string; native: string }[] = [
+    { value: "es", label: "Español", native: "Español" },
+    { value: "en", label: "English", native: "English" },
+  ];
 
   return (
     <div className="min-h-screen bg-aula-bg p-4 md:p-8">
       <div className="max-w-xl mx-auto space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-heading font-bold text-aula-ink tracking-tight">Configuración</h1>
+          <h1 className="text-xl font-heading font-bold text-aula-ink tracking-tight">{t("settings.title")}</h1>
           <div className="flex gap-3 text-xs text-aula-ink-soft">
-            <Link href="/chat" className="hover:text-aula-ink hover:underline">← Chat</Link>
-            <Link href="/" className="hover:text-aula-ink hover:underline">Inicio</Link>
+            <Link href="/chat" className="hover:text-aula-ink hover:underline">{t("settings.back")}</Link>
+            <Link href="/"    className="hover:text-aula-ink hover:underline">{t("settings.home")}</Link>
           </div>
         </div>
+
+        {/* Language */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-heading">{t("settings.language.title")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              {LANG_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setLang(opt.value)}
+                  className={`flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+                    lang === opt.value
+                      ? "border-aula-blue bg-blue-50 text-aula-blue"
+                      : "border-gray-200 text-aula-ink-soft hover:bg-gray-50"
+                  }`}
+                  aria-pressed={lang === opt.value}
+                >
+                  {opt.native}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Socrático mode */}
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-heading font-semibold text-aula-ink">{t("settings.socratic.title")}</p>
+                <p className="text-xs text-aula-ink-soft mt-0.5">{t("settings.socratic.desc")}</p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={socraticMode}
+                onClick={() => setSocraticMode(!socraticMode)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-2 focus-visible:outline-aula-blue ${
+                  socraticMode ? "bg-aula-blue" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    socraticMode ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Engine Selection */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Engine Selection</CardTitle>
+            <CardTitle className="text-sm font-heading">{t("settings.engine.title")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
               {ENGINE_OPTIONS.map((opt) => (
                 <label
                   key={opt.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                     localEngine === opt.id
                       ? "border-aula-blue bg-blue-50"
                       : "border-gray-200 hover:bg-gray-50"
@@ -147,7 +175,6 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            {/* Prefer cloud toggle (only meaningful on Auto) */}
             {localEngine === "auto" && (
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input
@@ -156,16 +183,13 @@ export default function SettingsPage() {
                   onChange={(e) => setLocalPreferCloud(e.target.checked)}
                   className="rounded"
                 />
-                <span>Preferir Cloud cuando hay API key disponible</span>
+                <span>{t("settings.engine.preferCloud")}</span>
               </label>
             )}
 
-            {/* API Key input */}
             {needsKey && (
               <div className="space-y-2 pt-1">
-                <label className="text-xs font-medium text-gray-700">
-                  Google AI Studio API Key
-                </label>
+                <label className="text-xs font-medium text-gray-700">{t("settings.engine.keyLabel")}</label>
                 <div className="flex gap-2">
                   <input
                     type="password"
@@ -173,37 +197,32 @@ export default function SettingsPage() {
                     onChange={(e) => setLocalKey(e.target.value)}
                     placeholder="AIza…"
                     autoComplete="off"
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-aula-blue"
+                    className="flex-1 rounded-xl border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-aula-blue"
                   />
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-xs h-9"
+                    className="text-xs h-9 rounded-xl"
                     disabled={testState === "testing"}
-                    onClick={handleTest}
+                    onClick={() => { void handleTest(); }}
                   >
-                    {testState === "testing" ? "Testing…" : "Test"}
+                    {testState === "testing" ? t("settings.engine.testing") : t("settings.engine.test")}
                   </Button>
                 </div>
                 {testMsg && (
-                  <p
-                    className={`text-xs ${
-                      testState === "ok" ? "text-green-700" : "text-red-700"
-                    }`}
-                  >
+                  <p className={`text-xs ${testState === "ok" ? "text-green-700" : "text-red-700"}`}>
                     {testMsg}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground leading-snug">
-                  Tu API key se guarda solo en tu navegador — nunca se envía a ningún servidor
-                  excepto la API oficial de Google.{" "}
+                  {t("settings.engine.keyHint")}{" "}
                   <a
                     href="https://aistudio.google.com/apikey"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline text-blue-600 hover:text-blue-800"
+                    className="underline text-aula-blue hover:text-aula-blue-dark"
                   >
-                    Obtén una API key gratuita →
+                    {t("settings.engine.keyLink")}
                   </a>
                 </p>
               </div>
@@ -212,17 +231,17 @@ export default function SettingsPage() {
             <Button
               onClick={handleSave}
               disabled={!hasChanges && saveState !== "saved"}
-              className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white"
+              className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white rounded-xl"
               size="sm"
             >
-              {saveState === "saved" ? "Guardado ✓" : "Guardar"}
+              {saveState === "saved" ? t("common.saved") : t("common.save")}
             </Button>
           </CardContent>
         </Card>
 
         {/* Hardware Diagnostics */}
         <div className="space-y-1.5">
-          <h2 className="text-sm font-heading font-semibold text-aula-ink">Diagnóstico de hardware</h2>
+          <h2 className="text-sm font-heading font-semibold text-aula-ink">{t("settings.hardware.title")}</h2>
           <GpuDiagnostics />
           <RamInfo />
         </div>
@@ -232,16 +251,12 @@ export default function SettingsPage() {
 }
 
 function RamInfo() {
-  // navigator.deviceMemory is an approximation rounded to the nearest power of 2
   const ram =
     "deviceMemory" in navigator
       ? (navigator as Navigator & { deviceMemory: number }).deviceMemory
       : null;
-
   if (ram === null) return null;
-
   const isLow = ram < 8;
-
   return (
     <Card className={isLow ? "border-yellow-200 bg-yellow-50" : "border-gray-200"}>
       <CardContent className="py-2 px-4 text-xs flex items-center gap-2">

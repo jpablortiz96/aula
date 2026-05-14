@@ -29,8 +29,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     xpReward:    50,
   },
   {
-    id:          "multimodal",
-    title:       "Multimodal",
+    id:          "eye-reader",
+    title:       "Ojo lector",
     description: "Enviaste una foto para analizar",
     icon:        "📸",
     xpReward:    20,
@@ -47,6 +47,27 @@ export const ACHIEVEMENTS: Achievement[] = [
     title:       "Profe por un día",
     description: "Generaste tu primer quiz",
     icon:        "👩‍🏫",
+    xpReward:    30,
+  },
+  {
+    id:          "whiteboard",
+    title:       "Pizarrón mágico",
+    description: "Resolviste algo escrito a mano",
+    icon:        "✏️",
+    xpReward:    25,
+  },
+  {
+    id:          "thinker",
+    title:       "Pensador",
+    description: "Usaste el modo socrático",
+    icon:        "🦉",
+    xpReward:    35,
+  },
+  {
+    id:          "curious-mind",
+    title:       "Mente curiosa",
+    description: "Usaste 'No entendí' 5 veces",
+    icon:        "🧠",
     xpReward:    30,
   },
 ];

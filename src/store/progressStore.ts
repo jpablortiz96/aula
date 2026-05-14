@@ -4,9 +4,9 @@ import { persist } from "zustand/middleware";
 // ─── Levels ──────────────────────────────────────────────────────────────────
 
 export interface Level {
-  name:    string;
-  minXp:   number;
-  color:   string;
+  name:  string;
+  minXp: number;
+  color: string;
 }
 
 export const LEVELS: Level[] = [
@@ -35,7 +35,7 @@ export function getLevelProgress(xp: number): number {
   const current = getCurrentLevel(xp);
   const next    = getNextLevel(xp);
   if (!next) return 1;
-  const range = next.minXp - current.minXp;
+  const range  = next.minXp - current.minXp;
   const earned = xp - current.minXp;
   return Math.min(1, earned / range);
 }
@@ -46,7 +46,7 @@ const XP_PER_QUESTION = 10;
 const XP_PER_SESSION  = 5;
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  return new Date().toISOString().slice(0, 10);
 }
 function yesterdayStr(): string {
   const d = new Date();
@@ -66,19 +66,22 @@ interface ProgressState {
   hasUsedCamera:        boolean;
   hasUsedVoice:         boolean;
   hasGeneratedQuiz:     boolean;
+  hasUsedWhiteboard:    boolean;
+  hasUsedSocratic:      boolean;
 
-  // Pending achievement to show as toast (consumed by AchievementToast)
-  pendingAchievement: string | null;
-  consumePendingAchievement: () => void;
+  pendingAchievement:         string | null;
+  consumePendingAchievement:  () => void;
 
-  // Actions
-  startSession:       () => void;
-  addQuestion:        () => void;
-  addXP:              (amount: number) => void;
-  unlockAchievement:  (id: string) => void;
-  recordCameraUsed:   () => void;
-  recordVoiceUsed:    () => void;
-  recordQuizGenerated:() => void;
+  startSession:         () => void;
+  addQuestion:          () => void;
+  addXP:                (amount: number) => void;
+  unlockAchievement:    (id: string) => void;
+  recordCameraUsed:     () => void;
+  recordVoiceUsed:      () => void;
+  recordQuizGenerated:  () => void;
+  recordWhiteboardUsed: () => void;
+  recordSocraticUsed:   () => void;
+  checkSimplifyCount:   (count: number) => void;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -95,6 +98,8 @@ export const useProgressStore = create<ProgressState>()(
       hasUsedCamera:        false,
       hasUsedVoice:         false,
       hasGeneratedQuiz:     false,
+      hasUsedWhiteboard:    false,
+      hasUsedSocratic:      false,
       pendingAchievement:   null,
 
       consumePendingAchievement: () => set({ pendingAchievement: null }),
@@ -108,9 +113,7 @@ export const useProgressStore = create<ProgressState>()(
         }));
       },
 
-      addXP: (amount: number) => {
-        set((s) => ({ xp: s.xp + amount }));
-      },
+      addXP: (amount: number) => set((s) => ({ xp: s.xp + amount })),
 
       startSession: () => {
         const { lastUsedDate, streak, unlockAchievement, addXP } = get();
@@ -118,11 +121,10 @@ export const useProgressStore = create<ProgressState>()(
 
         let newStreak = streak;
         if (lastUsedDate === null || lastUsedDate < yesterdayStr()) {
-          newStreak = 1; // reset or first day
+          newStreak = 1;
         } else if (lastUsedDate === yesterdayStr()) {
           newStreak = streak + 1;
         }
-        // If lastUsedDate === today → already counted, no change to streak
 
         set((s) => ({
           streak:        newStreak,
@@ -131,7 +133,6 @@ export const useProgressStore = create<ProgressState>()(
         }));
 
         addXP(XP_PER_SESSION);
-
         if (newStreak >= 3) unlockAchievement("dedicated");
       },
 
@@ -140,7 +141,6 @@ export const useProgressStore = create<ProgressState>()(
         const newTotal = totalQuestions + 1;
         set({ totalQuestions: newTotal });
         addXP(XP_PER_QUESTION);
-
         if (newTotal === 1)  unlockAchievement("first-question");
         if (newTotal === 10) unlockAchievement("curious");
       },
@@ -149,7 +149,7 @@ export const useProgressStore = create<ProgressState>()(
         const { hasUsedCamera, unlockAchievement } = get();
         if (hasUsedCamera) return;
         set({ hasUsedCamera: true });
-        unlockAchievement("multimodal");
+        unlockAchievement("eye-reader");
       },
 
       recordVoiceUsed: () => {
@@ -164,6 +164,25 @@ export const useProgressStore = create<ProgressState>()(
         if (hasGeneratedQuiz) return;
         set({ hasGeneratedQuiz: true });
         unlockAchievement("teacher");
+      },
+
+      recordWhiteboardUsed: () => {
+        const { hasUsedWhiteboard, unlockAchievement } = get();
+        if (hasUsedWhiteboard) return;
+        set({ hasUsedWhiteboard: true });
+        unlockAchievement("whiteboard");
+      },
+
+      recordSocraticUsed: () => {
+        const { hasUsedSocratic, unlockAchievement } = get();
+        if (hasUsedSocratic) return;
+        set({ hasUsedSocratic: true });
+        unlockAchievement("thinker");
+      },
+
+      checkSimplifyCount: (count: number) => {
+        const { unlockAchievement } = get();
+        if (count >= 5) unlockAchievement("curious-mind");
       },
     }),
     { name: "aula-progress" },

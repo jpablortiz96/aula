@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ACHIEVEMENTS_BY_ID } from "@/lib/achievements";
 import { useProgressStore } from "@/store/progressStore";
+import { useT } from "@/hooks/useT";
 
 export function AchievementToast() {
+  const t                    = useT();
   const pendingId            = useProgressStore((s) => s.pendingAchievement);
   const consume              = useProgressStore((s) => s.consumePendingAchievement);
   const [visible, setVisible] = useState(false);
@@ -35,6 +37,9 @@ export function AchievementToast() {
   const achievement = ACHIEVEMENTS_BY_ID[current];
   if (!achievement) return null;
 
+  const titleKey = `achievement.${achievement.id}.title`;
+  const descKey  = `achievement.${achievement.id}.desc`;
+
   return (
     <div
       role="status"
@@ -45,9 +50,9 @@ export function AchievementToast() {
     >
       <span className="text-2xl shrink-0" aria-hidden="true">{achievement.icon}</span>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-aula-ink">¡Logro desbloqueado!</p>
-        <p className="text-sm font-bold text-aula-blue truncate">{achievement.title}</p>
-        <p className="text-xs text-aula-ink-soft truncate">{achievement.description}</p>
+        <p className="text-xs font-semibold text-aula-ink">{t("toast.achievementUnlocked")}</p>
+        <p className="text-sm font-bold text-aula-blue truncate">{t(titleKey) || achievement.title}</p>
+        <p className="text-xs text-aula-ink-soft truncate">{t(descKey) || achievement.description}</p>
       </div>
       <span className="shrink-0 text-xs font-bold text-aula-green">+{achievement.xpReward} XP</span>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Lang } from "@/store/i18nStore";
 
 // Web Speech API types — not yet in lib.dom.d.ts for all TS versions
 interface SpeechRecognitionAlternativeExt {
@@ -49,7 +50,8 @@ export interface UseSpeechRecognitionReturn {
 }
 
 export function useSpeechRecognition(
-  onFinal: (text: string) => void
+  onFinal: (text: string) => void,
+  lang: Lang = "es",
 ): UseSpeechRecognitionReturn {
   const [isListening,       setIsListening]       = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -58,13 +60,14 @@ export function useSpeechRecognition(
   onFinalRef.current   = onFinal;
 
   const supported = typeof window !== "undefined" && getSpeechRecognitionCtor() !== null;
+  const bcp47     = lang === "en" ? "en-US" : "es-CO";
 
   useEffect(() => {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
 
     const recognition = new Ctor();
-    recognition.lang            = "es-CO";
+    recognition.lang            = bcp47;
     recognition.continuous      = false;
     recognition.interimResults  = true;
 
@@ -87,7 +90,7 @@ export function useSpeechRecognition(
 
     recognitionRef.current = recognition;
     return () => { recognition.abort(); };
-  }, []);
+  }, [bcp47]);
 
   const start = useCallback(() => {
     if (!recognitionRef.current || isListening) return;
