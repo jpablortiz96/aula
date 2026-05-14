@@ -9,6 +9,8 @@ const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 interface GeminiPart {
   text?: string;
+  /** true when this part is internal reasoning (thinking mode) — must be ignored */
+  thought?: boolean;
   inlineData?: { mimeType: string; data: string };
 }
 
@@ -25,6 +27,32 @@ interface GeminiCandidate {
 interface GeminiStreamChunk {
   candidates?: GeminiCandidate[];
   error?: { code: number; message: string; status: string };
+}
+
+// ---------------------------------------------------------
+
+/**
+ * Layer 2B — heuristic fallback to strip Gemma 4 thinking preamble.
+ * Only used when the `thought` flag is absent from all parts (older API versions).
+ * Conservative: stops filtering at the first line that looks like real prose.
+ */
+const THINKING_META_RE =
+  /^[\s*-]*(?:Topic|Persona|Language|Format|Constraints?|Intro|Word\s*count|Emojis?|Markdown|LaTeX|Step\s+\d+|Response\s+strategy|Planning|Analysis|Approach|Goal)\s*:/i;
+
+function stripThinkingPreamble(text: string): string {
+  const lines = text.split("\n");
+  let firstRealIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;                    // blank — could be in preamble
+    if (THINKING_META_RE.test(line)) continue; // metadata line — skip
+    firstRealIdx = i;
+    break;
+  }
+
+  if (firstRealIdx <= 0) return text;       // no preamble detected, return as-is
+  return lines.slice(firstRealIdx).join("\n").trimStart();
 }
 
 // ---------------------------------------------------------
@@ -109,11 +137,18 @@ export class CloudBoostEngine implements ChatEngine {
     const systemInstruction = getSystemInstruction(messages);
     const contents = toGeminiContents(messages);
 
+    // Layer 1: ask the API to suppress thinking output.
+    // thinkingBudget: 0 disables thinking tokens entirely (most reliable).
+    // If the API returns 400 on thinkingConfig, try in order:
+    //   a) thinkingConfig: { thinkingLevel: "low" }
+    //   b) thinkingConfig: { includeThoughts: false }
+    //   c) remove thinkingConfig — rely solely on Layer 2 (part.thought filter)
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
-        maxOutputTokens: opts.maxTokens ?? 1024,
+        maxOutputTokens: opts.maxTokens ?? 800,
         temperature: opts.temperature ?? 0.7,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     };
 
@@ -124,7 +159,7 @@ export class CloudBoostEngine implements ChatEngine {
     this.abortController = new AbortController();
     const { signal } = this.abortController;
 
-    // alt=sse MUST come before key so the param is always present regardless of key format
+    // alt=sse forces Server-Sent Events (true streaming chunks, not a JSON array)
     const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?alt=sse&key=${key}`;
 
     const res = await fetch(url, {
@@ -134,6 +169,15 @@ export class CloudBoostEngine implements ChatEngine {
       signal,
     });
 
+    if (res.status === 400) {
+      // thinkingConfig may not be supported — retry without it
+      const errBody = (await res.json().catch(() => ({}))) as GeminiStreamChunk;
+      const errMsg = errBody.error?.message ?? "";
+      if (errMsg.toLowerCase().includes("thinking")) {
+        return this.generateWithoutThinkingConfig(messages, opts, key, signal);
+      }
+      throw new Error(errMsg || `HTTP 400`);
+    }
     if (res.status === 401) throw new Error("API key inválida — verifica tu clave de Google AI Studio.");
     if (res.status === 429) throw new Error("Rate limit alcanzado — espera un momento antes de reintentar.");
     if (!res.ok) {
@@ -141,12 +185,58 @@ export class CloudBoostEngine implements ChatEngine {
       throw new Error(errBody.error?.message ?? `HTTP ${res.status}`);
     }
 
+    return this.readStream(res, opts);
+  }
+
+  /** Fallback: same request without thinkingConfig when the API rejects it (Layer 1c). */
+  private async generateWithoutThinkingConfig(
+    messages: ChatMessage[],
+    opts: GenerateOptions,
+    key: string,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const systemInstruction = getSystemInstruction(messages);
+    const contents = toGeminiContents(messages);
+
+    const body: Record<string, unknown> = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: opts.maxTokens ?? 800,
+        temperature: opts.temperature ?? 0.7,
+        // thinkingConfig omitted — not supported by this model/version
+      },
+    };
+
+    if (systemInstruction) {
+      body.systemInstruction = { parts: [{ text: systemInstruction }] };
+    }
+
+    const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?alt=sse&key=${key}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as GeminiStreamChunk;
+      throw new Error(errBody.error?.message ?? `HTTP ${res.status}`);
+    }
+
+    return this.readStream(res, opts);
+  }
+
+  /** Parse an SSE stream from the Gemini API, filtering out thought parts. */
+  private async readStream(res: Response, opts: GenerateOptions): Promise<string> {
     if (!res.body) throw new Error("Response has no body — streaming not supported.");
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let accumulated = "";
-    let buffer = ""; // holds incomplete SSE lines across chunk boundaries
+    let buffer = "";
+    let sawThoughtFlag = false; // tracks whether ANY part had thought: true
 
     try {
       while (true) {
@@ -155,7 +245,7 @@ export class CloudBoostEngine implements ChatEngine {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Split on newlines but keep the last (potentially incomplete) segment in buffer
+        // Split on newlines; keep last (possibly incomplete) line in buffer
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
@@ -170,16 +260,23 @@ export class CloudBoostEngine implements ChatEngine {
           try {
             parsed = JSON.parse(jsonStr) as GeminiStreamChunk;
           } catch {
-            // Partial JSON across chunk boundary — will be in buffer next iteration
-            continue;
+            continue; // incomplete JSON at chunk boundary
           }
 
           if (parsed.error) throw new Error(parsed.error.message);
 
-          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          if (text) {
-            accumulated += text;
-            opts.onToken?.(text);
+          // Layer 2: iterate ALL parts; skip those marked as internal reasoning
+          const parts = parsed.candidates?.[0]?.content?.parts ?? [];
+          for (const part of parts) {
+            if (part.thought === true) {
+              sawThoughtFlag = true;
+              continue; // skip thinking tokens
+            }
+            const text = part.text ?? "";
+            if (text) {
+              accumulated += text;
+              opts.onToken?.(text);
+            }
           }
         }
       }
@@ -190,6 +287,12 @@ export class CloudBoostEngine implements ChatEngine {
       throw err;
     } finally {
       this.abortController = null;
+    }
+
+    // Layer 2B: if the thought flag was never seen, apply conservative heuristic
+    // to strip any thinking preamble that leaked as plain text
+    if (!sawThoughtFlag && accumulated) {
+      accumulated = stripThinkingPreamble(accumulated);
     }
 
     return accumulated;
