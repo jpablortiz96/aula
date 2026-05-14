@@ -45,6 +45,11 @@ export class MediaPipeEngine implements ChatEngine {
 
   private llm: LlmInference | null = null;
 
+  // Abort state — shared between abort() and the running generate() call
+  private aborted = false;
+  private abortResolve: ((text: string) => void) | null = null;
+  private currentAccumulated = "";
+
   async isReady(): Promise<boolean> {
     if (this.llm) return true;
     if (!navigator.gpu) return false;
@@ -100,18 +105,38 @@ export class MediaPipeEngine implements ChatEngine {
     );
   }
 
+  abort(): void {
+    this.aborted = true;
+    // Resolve the race promise with whatever text was accumulated so far
+    this.abortResolve?.(this.currentAccumulated);
+    this.abortResolve = null;
+  }
+
   async generate(messages: ChatMessage[], opts: GenerateOptions): Promise<string> {
     if (!this.llm) throw new Error("Engine not loaded — call load() first.");
 
-    const prompt = formatPrompt(messages);
-    let accumulated = "";
+    this.aborted = false;
+    this.currentAccumulated = "";
 
-    await this.llm.generateResponse(prompt, (partial: string, _done: boolean) => {
-      accumulated += partial;
-      opts.onToken?.(partial);
+    const prompt = formatPrompt(messages);
+
+    // abortPromise resolves early when abort() is called, winning the race
+    const abortPromise = new Promise<string>((resolve) => {
+      this.abortResolve = resolve;
     });
 
-    return accumulated;
+    const generatePromise = this.llm
+      .generateResponse(prompt, (partial: string, _done: boolean) => {
+        if (this.aborted) return;
+        this.currentAccumulated += partial;
+        opts.onToken?.(partial);
+      })
+      .then(() => {
+        this.abortResolve = null; // natural completion — no abort pending
+        return this.currentAccumulated;
+      });
+
+    return Promise.race([generatePromise, abortPromise]);
   }
 
   async unload(): Promise<void> {

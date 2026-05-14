@@ -66,6 +66,6 @@ export function clearEngineCache(): void {
 
 export const ENGINE_DISPLAY: Record<EngineId, string> = {
   "mediapipe": "MediaPipe (local)",
-  "cloud-boost": "Cloud Boost (Gemma 4 31B)",
+  "cloud-boost": "Cloud Boost (Gemma 4 26B)",
   "legacy-onnx": "ONNX Web (legacy)",
 };

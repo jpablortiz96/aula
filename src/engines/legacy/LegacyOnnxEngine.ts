@@ -101,6 +101,10 @@ export class LegacyOnnxEngine implements ChatEngine {
     });
   }
 
+  abort(): void {
+    // Web Worker generation cannot be cancelled mid-stream; this is a no-op
+  }
+
   async unload(): Promise<void> {
     this.worker?.terminate();
     this.worker = null;

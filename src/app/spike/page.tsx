@@ -111,10 +111,12 @@ export default function SpikePage() {
             <ChatInterface
               status={status}
               streamedText={streamedText}
+              pendingUserMsg={null}
               tokensPerSecond={tokensPerSecond}
               lastTotalMs={lastTotalMs}
               error={error}
               onGenerate={generate}
+              onStop={() => undefined}
             />
           </CardContent>
         </Card>

@@ -24,6 +24,7 @@ export default function ChatPage() {
     load,
     generate,
     abort,
+    pendingUserMsg,
   } = useChatEngine();
 
   const isLocal = capabilities?.runsLocally ?? true;
@@ -143,6 +144,7 @@ export default function ChatPage() {
               streamedText={streamedText}
               tokensPerSecond={tokensPerSecond}
               lastTotalMs={lastTotalMs}
+              pendingUserMsg={pendingUserMsg}
               error={error}
               onGenerate={generate}
               onStop={abort}

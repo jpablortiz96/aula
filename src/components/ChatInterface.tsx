@@ -8,16 +8,18 @@ import rehypeKatex from "rehype-katex";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { type ModelStatus, type ChatMessage } from "@/lib/constants";
+import { type ModelStatus } from "@/lib/constants";
+import { useChatStore } from "@/store/chatStore";
 
 interface ChatInterfaceProps {
   status: ModelStatus;
   streamedText: string;
+  pendingUserMsg: string | null;
   tokensPerSecond: number | null;
   lastTotalMs: number | null;
   error: string | null;
   onGenerate: (prompt: string) => void;
-  onStop?: () => void;
+  onStop: () => void;
 }
 
 const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = {
@@ -54,9 +56,15 @@ function AssistantBubble({ content, streaming }: { content: string; streaming?: 
       >
         {content}
       </ReactMarkdown>
-      {streaming && (
-        <span className="inline-block w-0.5 h-3.5 bg-gray-600 ml-0.5 animate-[blink_1s_step-end_infinite] align-middle" />
-      )}
+      {streaming && <span className="aula-cursor" aria-hidden="true" />}
+    </div>
+  );
+}
+
+function UserBubble({ content }: { content: string }) {
+  return (
+    <div className="max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed bg-green-600 text-white whitespace-pre-wrap">
+      {content}
     </div>
   );
 }
@@ -64,10 +72,8 @@ function AssistantBubble({ content, streaming }: { content: string; streaming?: 
 function TpsBadge({ tps, totalMs }: { tps: number | null; totalMs: number | null }) {
   if (tps === null) return null;
 
-  const color =
-    tps > 8 ? "text-green-600" : tps > 3 ? "text-yellow-600" : "text-red-600";
-  const bg =
-    tps > 8 ? "bg-green-50 border-green-200" : tps > 3 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
+  const color = tps > 8 ? "text-green-600" : tps > 3 ? "text-yellow-600" : "text-red-600";
+  const bg = tps > 8 ? "bg-green-50 border-green-200" : tps > 3 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
   const totalSec = totalMs !== null ? (totalMs / 1000).toFixed(1) : null;
 
   return (
@@ -81,6 +87,7 @@ function TpsBadge({ tps, totalMs }: { tps: number | null; totalMs: number | null
 export function ChatInterface({
   status,
   streamedText,
+  pendingUserMsg,
   tokensPerSecond,
   lastTotalMs,
   error,
@@ -88,11 +95,12 @@ export function ChatInterface({
   onStop,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [lastUserMsg, setLastUserMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isGenerating = status === "generating";
   const isReady = status === "ready";
+
+  // Persistent chat history from store (survives engine switches)
+  const { messages } = useChatStore();
 
   // De-prioritize expensive markdown re-render during streaming
   const deferredStreamText = useDeferredValue(streamedText);
@@ -101,35 +109,11 @@ export function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamedText]);
 
-  const prevStreamRef = useRef("");
-  useEffect(() => {
-    if (
-      !isGenerating &&
-      streamedText &&
-      streamedText !== prevStreamRef.current &&
-      lastUserMsg !== null
-    ) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: lastUserMsg },
-        { role: "assistant", content: streamedText },
-      ]);
-      setLastUserMsg(null);
-      prevStreamRef.current = streamedText;
-    }
-  }, [isGenerating, streamedText, lastUserMsg]);
-
   function handleSend() {
     if (!input.trim() || !isReady) return;
     const prompt = input.trim();
     setInput("");
-    setLastUserMsg(prompt);
-    prevStreamRef.current = "";
     onGenerate(prompt);
-  }
-
-  function handleStop() {
-    onStop?.();
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -140,46 +124,56 @@ export function ChatInterface({
   }
 
   const showStream = isGenerating && streamedText;
-  const showLastUser = isGenerating && lastUserMsg;
+  const showPending = isGenerating && pendingUserMsg;
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Tok/s badge — upper right, always visible when we have data */}
+      {/* Tok/s badge */}
       <div className="flex justify-end min-h-[26px]">
         <TpsBadge tps={tokensPerSecond} totalMs={lastTotalMs} />
       </div>
 
       {/* Message history */}
       <div className="h-[360px] overflow-y-auto rounded-lg border bg-white p-3 space-y-3">
-        {messages.length === 0 && !showLastUser && (
+        {messages.length === 0 && !showPending && (
           <p className="text-center text-sm text-muted-foreground mt-16">
             Load the model above, then ask anything.
           </p>
         )}
 
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {msg.role === "user" ? (
-              <div className="max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed bg-green-600 text-white whitespace-pre-wrap">
-                {msg.content}
+        {messages.map((msg) => {
+          if (msg.role === "system-notice") {
+            return (
+              <div key={msg.id} className="flex items-center gap-2 my-1">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 whitespace-nowrap px-1">{msg.content}</span>
+                <div className="flex-1 h-px bg-gray-200" />
               </div>
-            ) : (
-              <AssistantBubble content={msg.content} />
-            )}
-          </div>
-        ))}
+            );
+          }
 
-        {showLastUser && (
-          <div className="flex justify-end">
-            <div className="max-w-[80%] rounded-xl px-3 py-2 text-sm bg-green-600 text-white whitespace-pre-wrap">
-              {lastUserMsg}
+          return (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              {msg.role === "user" ? (
+                <UserBubble content={msg.content} />
+              ) : (
+                <AssistantBubble content={msg.content} />
+              )}
             </div>
+          );
+        })}
+
+        {/* Pending user message (not yet committed to history) */}
+        {showPending && (
+          <div className="flex justify-end">
+            <UserBubble content={pendingUserMsg!} />
           </div>
         )}
 
+        {/* Live streaming assistant bubble */}
         {showStream && (
           <div className="flex justify-start">
             <AssistantBubble content={deferredStreamText} streaming />
@@ -213,7 +207,7 @@ export function ChatInterface({
         />
         {isGenerating ? (
           <Button
-            onClick={handleStop}
+            onClick={onStop}
             className="bg-red-500 hover:bg-red-600 text-white self-end"
           >
             Stop

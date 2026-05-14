@@ -39,7 +39,6 @@ function toGeminiContents(messages: ChatMessage[]): GeminiContent[] {
 
     if (msg.images) {
       for (const dataUrl of msg.images) {
-        // data:image/png;base64,<data>
         const [header, data] = dataUrl.split(",");
         const mimeType = header.replace("data:", "").replace(";base64", "");
         parts.push({ inlineData: { mimeType, data: data ?? "" } });
@@ -89,15 +88,10 @@ export class CloudBoostEngine implements ChatEngine {
   async load(): Promise<void> {
     const key = this.loadKey();
 
-    const res = await fetch(
-      `${BASE_URL}/models/${MODEL}?key=${key}`
-    );
+    const res = await fetch(`${BASE_URL}/models/${MODEL}?key=${key}`);
 
     if (res.status === 401) throw new Error("API key inválida — verifica tu clave de Google AI Studio.");
-    if (res.status === 404) {
-      // Model might not be available yet; treat as ready (will fail on first generate)
-      return;
-    }
+    if (res.status === 404) return; // model in preview; treat as ready
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
       throw new Error(body.error?.message ?? `HTTP ${res.status}`);
@@ -130,15 +124,15 @@ export class CloudBoostEngine implements ChatEngine {
     this.abortController = new AbortController();
     const { signal } = this.abortController;
 
-    const res = await fetch(
-      `${BASE_URL}/models/${MODEL}:streamGenerateContent?key=${key}&alt=sse`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal,
-      }
-    );
+    // alt=sse MUST come before key so the param is always present regardless of key format
+    const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?alt=sse&key=${key}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
 
     if (res.status === 401) throw new Error("API key inválida — verifica tu clave de Google AI Studio.");
     if (res.status === 429) throw new Error("Rate limit alcanzado — espera un momento antes de reintentar.");
@@ -152,29 +146,35 @@ export class CloudBoostEngine implements ChatEngine {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let accumulated = "";
+    let buffer = ""; // holds incomplete SSE lines across chunk boundaries
 
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of chunk.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
+        // Split on newlines but keep the last (potentially incomplete) segment in buffer
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+
+          const jsonStr = trimmed.slice(6);
           if (!jsonStr || jsonStr === "[DONE]") continue;
 
           let parsed: GeminiStreamChunk;
           try {
             parsed = JSON.parse(jsonStr) as GeminiStreamChunk;
           } catch {
+            // Partial JSON across chunk boundary — will be in buffer next iteration
             continue;
           }
 
-          if (parsed.error) {
-            throw new Error(parsed.error.message);
-          }
+          if (parsed.error) throw new Error(parsed.error.message);
 
           const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
           if (text) {
@@ -185,7 +185,7 @@ export class CloudBoostEngine implements ChatEngine {
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        return accumulated;
+        return accumulated; // graceful stop — return partial text
       }
       throw err;
     } finally {
