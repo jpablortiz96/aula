@@ -1,7 +1,8 @@
 import type { ChatEngine, ChatMessage, EngineCapabilities, EngineId, GenerateOptions } from "../types";
 
 const API_KEY_STORAGE_KEY = "aula:google-ai-api-key";
-const MODEL = "gemma-4-31b-it";
+const MODEL = "gemma-4-26b-a4b-it";
+// Premium alternative: "gemma-4-31b-it"
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 // --- Google AI response types (subset we actually use) ---
@@ -57,7 +58,7 @@ function getSystemInstruction(messages: ChatMessage[]): string | undefined {
 
 export class CloudBoostEngine implements ChatEngine {
   readonly id: EngineId = "cloud-boost";
-  readonly displayName = "Cloud Boost (Gemma 4 31B via AI Studio)";
+  readonly displayName = "Cloud Boost (Gemma 4 26B via AI Studio)";
   readonly capabilities: EngineCapabilities = {
     supportsMultimodal: true,
     supportsStreaming: true,
@@ -66,6 +67,7 @@ export class CloudBoostEngine implements ChatEngine {
   };
 
   private apiKey: string | null = null;
+  private abortController: AbortController | null = null;
 
   private loadKey(): string {
     const stored = localStorage.getItem(API_KEY_STORAGE_KEY);
@@ -102,6 +104,11 @@ export class CloudBoostEngine implements ChatEngine {
     }
   }
 
+  abort(): void {
+    this.abortController?.abort();
+    this.abortController = null;
+  }
+
   async generate(messages: ChatMessage[], opts: GenerateOptions): Promise<string> {
     const key = this.apiKey ?? this.loadKey();
 
@@ -120,12 +127,16 @@ export class CloudBoostEngine implements ChatEngine {
       body.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
 
+    this.abortController = new AbortController();
+    const { signal } = this.abortController;
+
     const res = await fetch(
       `${BASE_URL}/models/${MODEL}:streamGenerateContent?key=${key}&alt=sse`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal,
       }
     );
 
@@ -142,34 +153,43 @@ export class CloudBoostEngine implements ChatEngine {
     const decoder = new TextDecoder();
     let accumulated = "";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
 
-      for (const line of chunk.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr || jsonStr === "[DONE]") continue;
+        for (const line of chunk.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr || jsonStr === "[DONE]") continue;
 
-        let parsed: GeminiStreamChunk;
-        try {
-          parsed = JSON.parse(jsonStr) as GeminiStreamChunk;
-        } catch {
-          continue;
-        }
+          let parsed: GeminiStreamChunk;
+          try {
+            parsed = JSON.parse(jsonStr) as GeminiStreamChunk;
+          } catch {
+            continue;
+          }
 
-        if (parsed.error) {
-          throw new Error(parsed.error.message);
-        }
+          if (parsed.error) {
+            throw new Error(parsed.error.message);
+          }
 
-        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (text) {
-          accumulated += text;
-          opts.onToken?.(text);
+          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+          if (text) {
+            accumulated += text;
+            opts.onToken?.(text);
+          }
         }
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return accumulated;
+      }
+      throw err;
+    } finally {
+      this.abortController = null;
     }
 
     return accumulated;

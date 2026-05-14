@@ -29,15 +29,16 @@ export interface UseChatEngineReturn {
   error: string | null;
   load: () => void;
   generate: (prompt: string) => void;
+  abort: () => void;
   switchEngine: (id: EngineId | "auto") => void;
 }
 
 const SYSTEM_MESSAGE: ChatMessage = {
   role: "system",
   content:
-    "Eres AULA, un tutor educativo para estudiantes latinoamericanos de secundaria. " +
-    "Responde en español neutro de LATAM. " +
-    "Usa markdown y LaTeX ($...$ inline, $$...$$ display). Máximo 200 palabras. ≤2 emojis.",
+    "Eres AULA, un tutor para estudiantes de secundaria en Latinoamérica. " +
+    "Responde en español neutro. " +
+    "Usa markdown y LaTeX ($...$ inline, $$...$$ display). Máximo 200 palabras. Máximo 2 emojis.",
 };
 
 export function useChatEngine(): UseChatEngineReturn {
@@ -122,15 +123,15 @@ export function useChatEngine(): UseChatEngineReturn {
         temperature: 0.7,
         onToken: (token) => {
           const now = performance.now();
-          if (firstTokenTimeRef.current === null && generationStartRef.current !== null) {
+          if (firstTokenTimeRef.current === null) {
             firstTokenTimeRef.current = now;
           }
           tokenCountRef.current += 1;
 
-          if (generationStartRef.current !== null) {
-            const elapsed = (now - generationStartRef.current) / 1000;
-            if (elapsed > 0) setTokensPerSecond(tokenCountRef.current / elapsed);
-          }
+          // Measure tok/s from first token, not from request start
+          const measureFrom = firstTokenTimeRef.current;
+          const elapsed = (now - measureFrom) / 1000;
+          if (elapsed > 0) setTokensPerSecond(tokenCountRef.current / elapsed);
 
           setStreamedText((prev) => prev + token);
         },
@@ -144,9 +145,12 @@ export function useChatEngine(): UseChatEngineReturn {
           }
         }
 
-        setTokensPerSecond(
-          tokenCountRef.current / ((performance.now() - (generationStartRef.current ?? 0)) / 1000)
-        );
+        // Final tok/s from first token
+        const measureFrom = firstTokenTimeRef.current ?? generationStartRef.current;
+        if (measureFrom !== null && tokenCountRef.current > 0) {
+          const finalTps = tokenCountRef.current / ((performance.now() - measureFrom) / 1000);
+          setTokensPerSecond(finalTps);
+        }
 
         historyRef.current = [
           ...historyRef.current,
@@ -161,6 +165,10 @@ export function useChatEngine(): UseChatEngineReturn {
         setStatus("ready");
       });
   }, [status]);
+
+  const abort = useCallback(() => {
+    engineRef.current?.abort?.();
+  }, []);
 
   const switchEngine = useCallback((id: EngineId | "auto") => {
     clearEngineCache();
@@ -194,6 +202,7 @@ export function useChatEngine(): UseChatEngineReturn {
     error,
     load: triggerLoad,
     generate,
+    abort,
     switchEngine,
   };
 }

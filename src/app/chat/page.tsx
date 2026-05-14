@@ -23,6 +23,7 @@ export default function ChatPage() {
     error,
     load,
     generate,
+    abort,
   } = useChatEngine();
 
   const isLocal = capabilities?.runsLocally ?? true;
@@ -144,6 +145,7 @@ export default function ChatPage() {
               lastTotalMs={lastTotalMs}
               error={error}
               onGenerate={generate}
+              onStop={abort}
             />
           </CardContent>
         </Card>

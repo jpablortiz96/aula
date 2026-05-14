@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, type KeyboardEvent } from "react";
+import { useRef, useState, useEffect, useDeferredValue, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
   lastTotalMs: number | null;
   error: string | null;
   onGenerate: (prompt: string) => void;
+  onStop?: () => void;
 }
 
 const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = {
@@ -54,13 +55,13 @@ function AssistantBubble({ content, streaming }: { content: string; streaming?: 
         {content}
       </ReactMarkdown>
       {streaming && (
-        <span className="inline-block w-0.5 h-3.5 bg-gray-600 ml-0.5 animate-pulse align-middle" />
+        <span className="inline-block w-0.5 h-3.5 bg-gray-600 ml-0.5 animate-[blink_1s_step-end_infinite] align-middle" />
       )}
     </div>
   );
 }
 
-function Tpsbadge({ tps, totalMs }: { tps: number | null; totalMs: number | null }) {
+function TpsBadge({ tps, totalMs }: { tps: number | null; totalMs: number | null }) {
   if (tps === null) return null;
 
   const color =
@@ -84,6 +85,7 @@ export function ChatInterface({
   lastTotalMs,
   error,
   onGenerate,
+  onStop,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -91,6 +93,9 @@ export function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isGenerating = status === "generating";
   const isReady = status === "ready";
+
+  // De-prioritize expensive markdown re-render during streaming
+  const deferredStreamText = useDeferredValue(streamedText);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,6 +128,10 @@ export function ChatInterface({
     onGenerate(prompt);
   }
 
+  function handleStop() {
+    onStop?.();
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -137,7 +146,7 @@ export function ChatInterface({
     <div className="flex flex-col gap-3">
       {/* Tok/s badge — upper right, always visible when we have data */}
       <div className="flex justify-end min-h-[26px]">
-        <Tpsbadge tps={tokensPerSecond} totalMs={lastTotalMs} />
+        <TpsBadge tps={tokensPerSecond} totalMs={lastTotalMs} />
       </div>
 
       {/* Message history */}
@@ -173,7 +182,7 @@ export function ChatInterface({
 
         {showStream && (
           <div className="flex justify-start">
-            <AssistantBubble content={streamedText} streaming />
+            <AssistantBubble content={deferredStreamText} streaming />
           </div>
         )}
 
@@ -202,13 +211,22 @@ export function ChatInterface({
           className="resize-none min-h-[60px] max-h-[120px]"
           rows={2}
         />
-        <Button
-          onClick={handleSend}
-          disabled={!isReady || isGenerating || !input.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white self-end"
-        >
-          {isGenerating ? "…" : "Send"}
-        </Button>
+        {isGenerating ? (
+          <Button
+            onClick={handleStop}
+            className="bg-red-500 hover:bg-red-600 text-white self-end"
+          >
+            Stop
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSend}
+            disabled={!isReady || !input.trim()}
+            className="bg-green-600 hover:bg-green-700 text-white self-end"
+          >
+            Send
+          </Button>
+        )}
       </div>
     </div>
   );

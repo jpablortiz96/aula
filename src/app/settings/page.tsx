@@ -21,7 +21,7 @@ const ENGINE_OPTIONS: { id: EngineSelection; label: string; description: string 
   },
   {
     id: "cloud-boost",
-    label: "Cloud — Gemma 4 31B via AI Studio",
+    label: "Cloud — Gemma 4 26B via AI Studio",
     description: "Mayor calidad de respuestas. Requiere API key de Google.",
   },
 ];
@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${localKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${localKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -80,7 +80,7 @@ export default function SettingsPage() {
       }
       if (res.status === 404) {
         // Model might not exist yet; key is valid
-        setTestMsg("Key válida (modelo gemma-4-31b-it en preview — disponible próximamente).");
+        setTestMsg("Key válida (modelo gemma-4-26b-a4b-it en preview — disponible próximamente).");
         setTestState("ok");
         return;
       }

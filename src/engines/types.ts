@@ -28,4 +28,5 @@ export interface ChatEngine {
   load(onProgress?: (p: number) => void): Promise<void>;
   generate(messages: ChatMessage[], opts: GenerateOptions): Promise<string>;
   unload?(): Promise<void>;
+  abort?(): void;
 }
