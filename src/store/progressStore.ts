@@ -63,25 +63,31 @@ interface ProgressState {
   totalQuestions:       number;
   xp:                   number;
   unlockedAchievements: string[];
-  hasUsedCamera:        boolean;
-  hasUsedVoice:         boolean;
-  hasGeneratedQuiz:     boolean;
-  hasUsedWhiteboard:    boolean;
-  hasUsedSocratic:      boolean;
+  hasUsedCamera:           boolean;
+  hasUsedVoice:            boolean;
+  hasGeneratedQuiz:        boolean;
+  hasUsedWhiteboard:       boolean;
+  hasUsedSocratic:         boolean;
+  hasUsedEquationBuilder:  boolean;
+  hasUsedIllustrator:      boolean;
+  practiceExerciseCount:   number;
 
   pendingAchievement:         string | null;
   consumePendingAchievement:  () => void;
 
-  startSession:         () => void;
-  addQuestion:          () => void;
-  addXP:                (amount: number) => void;
-  unlockAchievement:    (id: string) => void;
-  recordCameraUsed:     () => void;
-  recordVoiceUsed:      () => void;
-  recordQuizGenerated:  () => void;
-  recordWhiteboardUsed: () => void;
-  recordSocraticUsed:   () => void;
-  checkSimplifyCount:   (count: number) => void;
+  startSession:                () => void;
+  addQuestion:                 () => void;
+  addXP:                       (amount: number) => void;
+  unlockAchievement:           (id: string) => void;
+  recordCameraUsed:            () => void;
+  recordVoiceUsed:             () => void;
+  recordQuizGenerated:         () => void;
+  recordWhiteboardUsed:        () => void;
+  recordSocraticUsed:          () => void;
+  checkSimplifyCount:          (count: number) => void;
+  recordEquationBuilderUsed:   () => void;
+  recordPracticeExercise:      () => void;
+  recordIllustratorUsed:       () => void;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -95,12 +101,15 @@ export const useProgressStore = create<ProgressState>()(
       totalQuestions:       0,
       xp:                   0,
       unlockedAchievements: [],
-      hasUsedCamera:        false,
-      hasUsedVoice:         false,
-      hasGeneratedQuiz:     false,
-      hasUsedWhiteboard:    false,
-      hasUsedSocratic:      false,
-      pendingAchievement:   null,
+      hasUsedCamera:           false,
+      hasUsedVoice:            false,
+      hasGeneratedQuiz:        false,
+      hasUsedWhiteboard:       false,
+      hasUsedSocratic:         false,
+      hasUsedEquationBuilder:  false,
+      hasUsedIllustrator:      false,
+      practiceExerciseCount:   0,
+      pendingAchievement:      null,
 
       consumePendingAchievement: () => set({ pendingAchievement: null }),
 
@@ -183,6 +192,28 @@ export const useProgressStore = create<ProgressState>()(
       checkSimplifyCount: (count: number) => {
         const { unlockAchievement } = get();
         if (count >= 5) unlockAchievement("curious-mind");
+      },
+
+      recordEquationBuilderUsed: () => {
+        const { hasUsedEquationBuilder, unlockAchievement } = get();
+        if (hasUsedEquationBuilder) return;
+        set({ hasUsedEquationBuilder: true });
+        unlockAchievement("equation-builder");
+      },
+
+      recordPracticeExercise: () => {
+        const { practiceExerciseCount, unlockAchievement, addXP } = get();
+        const newCount = practiceExerciseCount + 1;
+        set({ practiceExerciseCount: newCount });
+        addXP(8);
+        if (newCount === 10) unlockAchievement("marathon");
+      },
+
+      recordIllustratorUsed: () => {
+        const { hasUsedIllustrator, unlockAchievement } = get();
+        if (hasUsedIllustrator) return;
+        set({ hasUsedIllustrator: true });
+        unlockAchievement("artist");
       },
     }),
     { name: "aula-progress" },

@@ -70,6 +70,27 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon:        "🧠",
     xpReward:    30,
   },
+  {
+    id:          "equation-builder",
+    title:       "Arquitecto de ecuaciones",
+    description: "Usaste el teclado matemático de la pizarra",
+    icon:        "⚗️",
+    xpReward:    30,
+  },
+  {
+    id:          "marathon",
+    title:       "Maratón",
+    description: "Completaste 10 ejercicios de práctica",
+    icon:        "🏃",
+    xpReward:    40,
+  },
+  {
+    id:          "artist",
+    title:       "Artista",
+    description: "Generaste una ilustración con IA",
+    icon:        "🎨",
+    xpReward:    35,
+  },
 ];
 
 export const ACHIEVEMENTS_BY_ID = Object.fromEntries(
