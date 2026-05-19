@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Keyboard, PenLine } from "lucide-react";
 import { Header } from "@/components/Header";
 import { AchievementToast } from "@/components/AchievementToast";
 import { DigitalWhiteboard } from "@/components/pizarra/DigitalWhiteboard";
@@ -20,17 +21,16 @@ function hasApiKey(): boolean {
 }
 
 export default function PizarraPage() {
-  const router                  = useRouter();
-  const t                       = useT();
-  const [tab, setTab]           = useState<Tab>("keyboard");
-  const [solving, setSolving]   = useState(false);
+  const router = useRouter();
+  const t      = useT();
+  const [tab, setTab] = useState<Tab>("keyboard");
 
-  const recordWhiteboard        = useProgressStore((s) => s.recordWhiteboardUsed);
-  const recordEquationBuilder   = useProgressStore((s) => s.recordEquationBuilderUsed);
+  const recordWhiteboard      = useProgressStore((s) => s.recordWhiteboardUsed);
+  const recordEquationBuilder = useProgressStore((s) => s.recordEquationBuilderUsed);
 
   function handleEquationSolve(latex: string, readable: string) {
     recordEquationBuilder();
-    const prompt = `Resuelve: $${latex}$ (es decir: ${readable})`;
+    const prompt  = `Resuelve: $${latex}$ (es decir: ${readable})`;
     const encoded = encodeURIComponent(prompt);
     router.push(`/chat?wb=${encoded}`);
   }
@@ -45,9 +45,6 @@ export default function PizarraPage() {
     sessionStorage.setItem("aula:wb-image", dataUrl);
     router.push("/chat?wb-cloud=1");
   }
-
-  const proEnabled = tab === "handwriting";
-  const apiKeyAvailable = proEnabled && hasApiKey();
 
   return (
     <div className="flex flex-col min-h-screen bg-aula-bg">
@@ -69,24 +66,29 @@ export default function PizarraPage() {
           </div>
         </div>
 
-        {/* Tab toggle */}
-        <div className="flex rounded-2xl bg-aula-surface p-1 gap-1" role="tablist">
+        {/* Tab toggle — visible pill selector */}
+        <div
+          className="flex rounded-2xl bg-gray-100 border border-gray-200 p-1 gap-1"
+          role="tablist"
+          aria-label={t("pizarra.title")}
+        >
           <TabBtn
             active={tab === "keyboard"}
             onClick={() => setTab("keyboard")}
-            role="tab"
             aria-selected={tab === "keyboard"}
           >
-            {t("pizarra.tab.keyboard")}
+            <Keyboard className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{t("pizarra.tab.keyboard")}</span>
           </TabBtn>
+
           <TabBtn
             active={tab === "handwriting"}
             onClick={() => setTab("handwriting")}
-            role="tab"
             aria-selected={tab === "handwriting"}
           >
+            <PenLine className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>{t("pizarra.tab.handwriting")}</span>
-            <span className="ml-1.5 text-[10px] font-semibold rounded-full bg-aula-yellow/20 text-aula-yellow px-1.5 py-0.5">
+            <span className="ml-1 text-[10px] font-bold rounded-full bg-aula-yellow px-1.5 py-0.5 text-white shrink-0">
               PRO
             </span>
           </TabBtn>
@@ -95,9 +97,9 @@ export default function PizarraPage() {
         {/* Panel */}
         <div className="flex-1">
           {tab === "keyboard" && (
-            <div className="rounded-3xl bg-aula-surface border border-aula-border p-5">
+            <div className="rounded-3xl bg-white border border-gray-200 shadow-sm p-5">
               <h2 className="text-sm font-semibold text-aula-ink mb-4">{t("equationBuilder.title")}</h2>
-              <EquationBuilder onSolve={handleEquationSolve} disabled={solving} />
+              <EquationBuilder onSolve={handleEquationSolve} />
             </div>
           )}
 
@@ -105,14 +107,13 @@ export default function PizarraPage() {
             <>
               {/* Pro badge */}
               <div className="flex justify-center mb-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-aula-yellow/30 bg-aula-yellow/10 text-aula-yellow text-xs font-medium px-3 py-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-aula-yellow/40 bg-aula-yellow/10 text-aula-yellow text-xs font-semibold px-3 py-1">
                   {t("pizarra.pro.badge")}
                 </span>
               </div>
 
-              {/* No API key state */}
               {!hasApiKey() ? (
-                <div className="rounded-3xl bg-aula-surface border border-aula-border p-6 flex flex-col items-center gap-3 text-center">
+                <div className="rounded-3xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col items-center gap-3 text-center">
                   <p className="text-sm text-aula-ink">{t("pizarra.pro.noKey")}</p>
                   <Link
                     href="/settings"
@@ -146,28 +147,28 @@ export default function PizarraPage() {
   );
 }
 
-// ─── TabBtn helper ────────────────────────────────────────────────────────────
+// ─── TabBtn ───────────────────────────────────────────────────────────────────
 
 function TabBtn({
   active,
   onClick,
   children,
-  ...rest
+  "aria-selected": ariaSelected,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  role?: string;
   "aria-selected"?: boolean;
 }) {
   return (
     <button
+      role="tab"
+      aria-selected={ariaSelected}
       onClick={onClick}
-      {...rest}
-      className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-2 text-sm font-medium transition-all ${
+      className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-3 text-sm font-medium transition-all ${
         active
-          ? "bg-white text-aula-ink shadow-sm"
-          : "text-aula-ink-soft hover:text-aula-ink"
+          ? "bg-white text-aula-blue shadow-sm border border-blue-100"
+          : "text-gray-500 hover:text-gray-800 hover:bg-white/50"
       }`}
     >
       {children}
