@@ -8,6 +8,7 @@ import { MediaPipeEngine } from "@/engines/mediapipe/MediaPipeEngine";
 import { CloudBoostEngine } from "@/engines/cloud-boost/CloudBoostEngine";
 import { LegacyOnnxEngine } from "@/engines/legacy/LegacyOnnxEngine";
 import type { ChatEngine, ChatMessage, EngineCapabilities, EngineId } from "@/engines/types";
+import { setActiveEngine, getActiveEngine } from "@/engines/engineSingleton";
 import type { ModelStatus } from "@/lib/constants";
 import { useI18nStore } from "@/store/i18nStore";
 import { useChatSettingsStore } from "@/store/chatSettingsStore";
@@ -98,17 +99,30 @@ export function useChatEngine(): UseChatEngineReturn {
       const id = await resolveEngine();
       setResolvedEngineId(id);
 
+      // Reuse module-level singleton if the same engine is already loaded
+      const existing = getActiveEngine();
+      if (existing && existing.id === id) {
+        engineRef.current = existing;
+        setCapabilities(existing.capabilities);
+        setProgress(100);
+        setStatus("ready");
+        return;
+      }
+
       if (engineRef.current?.id !== id) {
         engineRef.current?.abort();
         await engineRef.current?.unload?.();
+        setActiveEngine(null);
         engineRef.current = createEngine(id);
       }
 
       setCapabilities(engineRef.current.capabilities);
       await engineRef.current.load((p) => setProgress(p));
+      setActiveEngine(engineRef.current);
       setStatus("ready");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      setActiveEngine(null);
       setError(msg);
       setStatus("error");
     }
@@ -238,6 +252,7 @@ export function useChatEngine(): UseChatEngineReturn {
 
     clearEngineCache();
     setEngine(id);
+    setActiveEngine(null);
     engineRef.current?.abort();
     void engineRef.current?.unload?.();
     engineRef.current = null;
@@ -251,8 +266,9 @@ export function useChatEngine(): UseChatEngineReturn {
 
   useEffect(() => {
     return () => {
+      // Abort any in-flight generation but keep the engine alive in the singleton
+      // so that navigating back to this page skips the re-download.
       engineRef.current?.abort();
-      void engineRef.current?.unload?.();
     };
   }, []);
 

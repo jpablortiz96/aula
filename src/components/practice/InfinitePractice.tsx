@@ -12,8 +12,7 @@ import {
   type Exercise,
   type Difficulty,
 } from "@/lib/practice/generateExercise";
-
-const API_KEY_KEY = "aula:google-ai-api-key";
+import { getActiveEngine } from "@/engines/engineSingleton";
 
 // ─── Adaptive difficulty ──────────────────────────────────────────────────────
 
@@ -59,10 +58,6 @@ export function InfinitePractice() {
 
   const answerRef = useRef<HTMLTextAreaElement>(null);
 
-  const apiKey = typeof window !== "undefined"
-    ? (localStorage.getItem(API_KEY_KEY) ?? "")
-    : "";
-
   const handleAnalyzeError = useCallback(async () => {
     if (!exercise || !userAnswer) return;
     setAnalyzingError(true);
@@ -72,7 +67,6 @@ export function InfinitePractice() {
         exercise.answer,
         userAnswer,
         lang,
-        apiKey,
       );
       setErrorAnalysis(feedback);
     } catch {
@@ -80,7 +74,7 @@ export function InfinitePractice() {
     } finally {
       setAnalyzingError(false);
     }
-  }, [exercise, userAnswer, lang, apiKey]);
+  }, [exercise, userAnswer, lang]);
 
   const fetchExercise = useCallback(async (
     currentTopic: string,
@@ -94,7 +88,7 @@ export function InfinitePractice() {
     setShowErrorDetector(false);
 
     try {
-      const ex = await generateExercise(currentTopic, currentDifficulty, lang, apiKey);
+      const ex = await generateExercise(currentTopic, currentDifficulty, lang);
       setExercise(ex);
       setPhase("question");
       setTimeout(() => answerRef.current?.focus(), 100);
@@ -102,7 +96,7 @@ export function InfinitePractice() {
       setError(err instanceof Error ? err.message : String(err));
       setPhase("setup");
     }
-  }, [apiKey, lang]);
+  }, [lang]);
 
   const handleStart = useCallback(() => {
     if (!topic.trim()) return;
@@ -146,7 +140,12 @@ export function InfinitePractice() {
     void fetchExercise(topic.trim(), difficulty);
   }, [topic, difficulty, fetchExercise]);
 
-  if (!apiKey) {
+  const canGenerate =
+    typeof window !== "undefined" &&
+    (getActiveEngine() !== null ||
+      Boolean(localStorage.getItem("aula:google-ai-api-key")));
+
+  if (!canGenerate) {
     return (
       <div className="rounded-3xl bg-aula-surface border border-aula-border p-6 text-center">
         <p className="text-sm text-aula-ink">{t("practice.noApiKey")}</p>

@@ -364,10 +364,6 @@ export function ChatInterface({
   // Accessibility
   const { autoReadTTS, ttsSpeed } = useAccessibilityStore();
 
-  const apiKey = typeof window !== "undefined"
-    ? (localStorage.getItem("aula:google-ai-api-key") ?? "")
-    : "";
-
   // Voice
   const { speak, supported: ttsSupported } = useSpeechSynthesis(lang, ttsSpeed);
   const { isListening, interimTranscript, supported: sttSupported, start: startListening, stop: stopListening } =
@@ -602,9 +598,9 @@ export function ChatInterface({
                     simplifyLevel={simplifyLevels[msg.id] ?? 0}
                     onSpeak={ttsSupported ? () => speak(msg.content) : undefined}
                     onSimplify={isReady ? (lvl) => handleSimplify(msg.id, msg.content, lvl) : undefined}
-                    onIllustrate={apiKey ? async () => {
+                    onIllustrate={isReady ? async () => {
                       recordIllustrator();
-                      return generateIllustration(msg.content, lang, apiKey);
+                      return generateIllustration(msg.content, lang);
                     } : undefined}
                   />
                 )}

@@ -1,7 +1,5 @@
 import { extractJson } from "@/lib/jsonExtract";
-
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL    = "gemini-2.0-flash";
+import { generateText } from "@/engines/engineSingleton";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -11,17 +9,10 @@ export interface Exercise {
   explanation: string;
 }
 
-interface GeminiPart    { text?: string; thought?: boolean }
-interface GeminiResponse {
-  candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
-  error?: { message?: string };
-}
-
 export async function generateExercise(
   topic: string,
   difficulty: Difficulty,
   lang: "es" | "en",
-  apiKey: string,
 ): Promise<Exercise> {
   const diffLabel =
     lang === "es"
@@ -37,36 +28,7 @@ Responde ÚNICAMENTE con JSON válido (sin texto extra ni markdown):
 Reply ONLY with valid JSON (no extra text or markdown):
 {"question":"...","answer":"...","explanation":"..."}`;
 
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 400,
-      temperature: 0.8,
-      responseMimeType: "application/json",
-    },
-  };
-
-  const res = await fetch(
-    `${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
-    },
-  );
-
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as GeminiResponse;
-    throw new Error(err.error?.message ?? `HTTP ${res.status}`);
-  }
-
-  const data = (await res.json()) as GeminiResponse;
-  const raw = (data.candidates?.[0]?.content?.parts ?? [])
-    .filter((p) => p.thought !== true)
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
-
+  const raw = await generateText(prompt, { maxTokens: 400, temperature: 0.8 });
   if (!raw) throw new Error("Model returned empty response");
 
   const parsed = extractJson(raw) as Partial<Exercise>;
@@ -81,18 +43,11 @@ Reply ONLY with valid JSON (no extra text or markdown):
   };
 }
 
-interface ErrorAnalysis { feedback: string }
-
-/**
- * Ask the model to identify the conceptual error in the student's wrong answer.
- * Returns a short explanation string.
- */
 export async function analyzeConceptualError(
-  question:    string,
+  question:      string,
   correctAnswer: string,
   studentAnswer: string,
   lang: "es" | "en",
-  apiKey: string,
 ): Promise<string> {
   const prompt =
     lang === "es"
@@ -111,27 +66,8 @@ Student's answer: ${studentAnswer}
 
 Identify the conceptual error in the student's answer in 2-3 sentences. Be kind and constructive. Don't give the answer directly; help them understand what went wrong.`;
 
-  const res = await fetch(
-    `${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 200, temperature: 0.3 },
-      }),
-    },
-  );
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-  const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
-
-  return text || "No se pudo analizar el error.";
+  const text = await generateText(prompt, { maxTokens: 200, temperature: 0.3 });
+  return text || (lang === "es" ? "No se pudo analizar el error." : "Could not analyze the error.");
 }
 
 /** Loose answer comparison: case-insensitive, trim, normalize spaces + accents. */
@@ -141,14 +77,13 @@ export function answersMatch(userAnswer: string, correctAnswer: string): boolean
       .toLowerCase()
       .trim()
       .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")  // strip accents
+      .replace(/[̀-ͯ]/g, "")
       .replace(/\s+/g, " ");
 
   const u = normalize(userAnswer);
   const c = normalize(correctAnswer);
   if (u === c) return true;
 
-  // numeric comparison: "4" == "4.0" == "4,0"
   const uNum = parseFloat(u.replace(",", "."));
   const cNum = parseFloat(c.replace(",", "."));
   if (!isNaN(uNum) && !isNaN(cNum) && Math.abs(uNum - cNum) < 1e-9) return true;

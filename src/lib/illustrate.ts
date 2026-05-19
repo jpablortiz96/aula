@@ -1,22 +1,9 @@
 import { sanitizeSvg, isValidSvg } from "@/lib/svgSanitize";
+import { generateText } from "@/engines/engineSingleton";
 
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL    = "gemini-2.0-flash";
-
-interface GeminiPart     { text?: string; thought?: boolean }
-interface GeminiResponse {
-  candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
-  error?: { message?: string };
-}
-
-/**
- * Ask Gemini to produce an educational SVG for the given concept text.
- * Returns sanitized SVG string, or throws on error.
- */
 export async function generateIllustration(
   conceptText: string,
   lang: "es" | "en",
-  apiKey: string,
 ): Promise<string> {
   const instruction =
     lang === "es"
@@ -42,35 +29,7 @@ STRICT RULES:
 - NO <script> tags, event handlers, or external references.
 - No markdown, no explanations — ONLY the SVG.`;
 
-  const body = {
-    contents: [{ parts: [{ text: instruction }] }],
-    generationConfig: {
-      maxOutputTokens: 1200,
-      temperature: 0.4,
-    },
-  };
-
-  const res = await fetch(
-    `${BASE_URL}/models/${MODEL}:generateContent?key=${apiKey}`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
-    },
-  );
-
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as GeminiResponse;
-    throw new Error(err.error?.message ?? `HTTP ${res.status}`);
-  }
-
-  const data = (await res.json()) as GeminiResponse;
-  const raw = (data.candidates?.[0]?.content?.parts ?? [])
-    .filter((p) => p.thought !== true)
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
-
+  const raw = await generateText(instruction, { maxTokens: 1200, temperature: 0.4 });
   if (!raw) throw new Error("Empty response from model");
 
   const sanitized = sanitizeSvg(raw);
