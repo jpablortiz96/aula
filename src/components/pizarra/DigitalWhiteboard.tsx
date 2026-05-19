@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Pencil, Eraser, Trash2, Undo2, Loader2, Check, X } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { recognizeHandwriting, type StrokePoint } from "@/lib/handwriting/recognizeHandwriting";
 import { useT } from "@/hooks/useT";
@@ -9,21 +10,23 @@ import { useI18nStore } from "@/store/i18nStore";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Tool = "pen" | "eraser";
+type Tool  = "pen" | "eraser";
+type State = "idle" | "recognizing" | "confirming" | "error";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PEN_COLOR   = "#1a1a2e";
-const PEN_WIDTH   = 3;
-const ERASER_WIDTH= 24;
-const BG_COLOR    = "#FAFBFF";
+const PEN_COLOR    = "#1a1a2e";
+const PEN_WIDTH    = 3;
+const ERASER_WIDTH = 24;
+const BG_COLOR     = "#FAFBFF";
+const API_KEY_KEY  = "aula:google-ai-api-key";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  onSolve:   (recognizedText: string) => void;
-  onCancel?: () => void;
-  /** When provided, shows Cloud Boost option */
+  onSolve:       (recognizedText: string) => void;
+  onCancel?:     () => void;
+  /** Cloud Boost: sends the raw image to the chat to let Gemini solve it fully */
   onCloudBoost?: (rawDataUrl: string) => void;
 }
 
@@ -34,36 +37,49 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isDrawingRef    = useRef(false);
-  const lastPointRef    = useRef<{ x: number; y: number } | null>(null);
-  const currentStroke   = useRef<StrokePoint[]>([]);
-  const allStrokes      = useRef<StrokePoint[][]>([]);
-  const undoStackRef    = useRef<ImageData[]>([]);
+  const isDrawingRef  = useRef(false);
+  const lastPointRef  = useRef<{ x: number; y: number } | null>(null);
+  const currentStroke = useRef<StrokePoint[]>([]);
+  const allStrokes    = useRef<StrokePoint[][]>([]);
+  const undoStackRef  = useRef<ImageData[]>([]);
+  const cssRef        = useRef({ w: 0, h: 0 });
 
-  const [tool,   setTool]   = useState<Tool>("pen");
-  const [state,  setState]  = useState<"idle" | "recognizing" | "confirming" | "error">("idle");
-  const [recognized, setRecognized] = useState("");
+  const [tool,       setTool]       = useState<Tool>("pen");
+  const [state,      setState]      = useState<State>("idle");
   const [editedText, setEditedText] = useState("");
-  const [method, setMethod] = useState<"native" | "tesseract" | "failed">("tesseract");
+  const [method,     setMethod]     = useState<"native" | "gemini" | "failed">("gemini");
   const [hasStrokes, setHasStrokes] = useState(false);
+  const [noApiKey,   setNoApiKey]   = useState(false);
 
-  // ── Canvas setup ────────────────────────────────────────────────────────────
+  // ── Canvas setup (DPR-aware) ─────────────────────────────────────────────────
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas    = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
     const resize = () => {
-      const ctx = canvas.getContext("2d");
+      const ctx  = canvas.getContext("2d");
       if (!ctx) return;
-      const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      canvas.width  = container.clientWidth;
-      canvas.height = container.clientHeight;
-      fillBackground(ctx, canvas);
-      if (snapshot.width > 0 && snapshot.height > 0) {
-        ctx.putImageData(snapshot, 0, 0);
-      }
+      const dpr  = window.devicePixelRatio || 1;
+      const cssW = container.clientWidth;
+      const cssH = container.clientHeight;
+
+      const prevW = canvas.width;
+      const prevH = canvas.height;
+      const snap  = prevW > 0 && prevH > 0
+        ? ctx.getImageData(0, 0, prevW, prevH)
+        : null;
+
+      canvas.width        = cssW * dpr;
+      canvas.height       = cssH * dpr;
+      canvas.style.width  = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      cssRef.current       = { w: cssW, h: cssH };
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fillBg(ctx);
+      if (snap && snap.width > 0) ctx.putImageData(snap, 0, 0);
     };
 
     resize();
@@ -72,17 +88,14 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  function fillBackground(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  function fillBg(ctx: CanvasRenderingContext2D) {
+    const { w, h } = cssRef.current;
     ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, w, h);
   }
 
-  function getCanvas() {
-    return canvasRef.current!;
-  }
-  function getCtx() {
-    return getCanvas().getContext("2d")!;
-  }
+  function getCanvas() { return canvasRef.current!; }
+  function getCtx()    { return getCanvas().getContext("2d")!; }
 
   function pointerToCanvas(e: React.PointerEvent<HTMLCanvasElement>) {
     const rect = getCanvas().getBoundingClientRect();
@@ -92,8 +105,8 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
   // ── Drawing ──────────────────────────────────────────────────────────────────
 
   const saveSnapshot = useCallback(() => {
-    const ctx = getCtx();
     const canvas = getCanvas();
+    const ctx    = getCtx();
     undoStackRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     if (undoStackRef.current.length > 30) undoStackRef.current.shift();
   }, []);
@@ -108,10 +121,20 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
       saveSnapshot();
       currentStroke.current = [{ ...pt, t: Date.now() }];
       const ctx = getCtx();
+
+      // Draw initial dot so single taps are visible
+      ctx.fillStyle = PEN_COLOR;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, PEN_WIDTH / 2, 0, Math.PI * 2);
-      ctx.fillStyle = PEN_COLOR;
       ctx.fill();
+
+      // Open a continuous path — onPointerMove will append lineTo calls
+      ctx.strokeStyle = PEN_COLOR;
+      ctx.lineWidth   = PEN_WIDTH;
+      ctx.lineCap     = "round";
+      ctx.lineJoin    = "round";
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y);
     }
     setHasStrokes(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,21 +146,13 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
     const ctx = getCtx();
 
     if (tool === "eraser") {
-      ctx.clearRect(pt.x - ERASER_WIDTH / 2, pt.y - ERASER_WIDTH / 2, ERASER_WIDTH, ERASER_WIDTH);
       ctx.fillStyle = BG_COLOR;
       ctx.fillRect(pt.x - ERASER_WIDTH / 2, pt.y - ERASER_WIDTH / 2, ERASER_WIDTH, ERASER_WIDTH);
     } else {
-      const mid = {
-        x: (lastPointRef.current.x + pt.x) / 2,
-        y: (lastPointRef.current.y + pt.y) / 2,
-      };
-      ctx.beginPath();
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-      ctx.quadraticCurveTo(lastPointRef.current.x, lastPointRef.current.y, mid.x, mid.y);
-      ctx.strokeStyle = PEN_COLOR;
-      ctx.lineWidth   = PEN_WIDTH * (e.pressure > 0 ? Math.max(0.5, e.pressure) : 1);
-      ctx.lineCap     = "round";
-      ctx.lineJoin    = "round";
+      // No beginPath — keep adding to the path opened in onPointerDown
+      // This produces solid, gapless strokes no matter how fast the pointer moves
+      ctx.lineWidth = PEN_WIDTH * (e.pressure > 0 ? Math.max(0.5, e.pressure) : 1);
+      ctx.lineTo(pt.x, pt.y);
       ctx.stroke();
       currentStroke.current.push({ ...pt, t: Date.now() });
     }
@@ -160,47 +175,55 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
   // ── Tools ─────────────────────────────────────────────────────────────────────
 
   function handleUndo() {
-    const ctx = getCtx();
-    const canvas = getCanvas();
     const snap = undoStackRef.current.pop();
-    if (snap) {
-      ctx.putImageData(snap, 0, 0);
-    } else {
-      fillBackground(ctx, canvas);
-    }
+    if (snap) getCtx().putImageData(snap, 0, 0);
+    else fillBg(getCtx());
     if (allStrokes.current.length > 0) allStrokes.current.pop();
     setHasStrokes(allStrokes.current.length > 0);
   }
 
   function handleClear() {
-    const ctx = getCtx();
-    const canvas = getCanvas();
-    fillBackground(ctx, canvas);
-    undoStackRef.current = [];
-    allStrokes.current   = [];
+    fillBg(getCtx());
+    undoStackRef.current  = [];
+    allStrokes.current    = [];
     currentStroke.current = [];
     setHasStrokes(false);
     setState("idle");
+    setEditedText("");
   }
 
-  // ── Recognize ─────────────────────────────────────────────────────────────────
+  // ── Recognize & solve ─────────────────────────────────────────────────────────
 
   async function handleSolve() {
     if (!hasStrokes) return;
-    setState("recognizing");
 
-    const dataUrl  = getCanvas().toDataURL("image/png");
-    const strokes  = [...allStrokes.current];
-    const result   = await recognizeHandwriting(strokes, dataUrl, lang);
+    const apiKey = (typeof window !== "undefined"
+      ? localStorage.getItem(API_KEY_KEY)
+      : null) ?? undefined;
 
-    setMethod(result.method);
-
-    if (result.method === "failed" || result.text.length === 0) {
+    // No engine available at all — skip straight to manual input
+    if (!apiKey) {
+      setNoApiKey(true);
+      setEditedText("");
       setState("error");
       return;
     }
 
-    setRecognized(result.text);
+    setNoApiKey(false);
+    setState("recognizing");
+
+    const dataUrl = getCanvas().toDataURL("image/jpeg", 0.92);
+    const strokes = [...allStrokes.current];
+    const result  = await recognizeHandwriting(strokes, dataUrl, lang, apiKey);
+
+    setMethod(result.method);
+
+    if (result.method === "failed" || result.text.length === 0) {
+      setEditedText("");
+      setState("error");
+      return;
+    }
+
     setEditedText(result.text);
     setState("confirming");
   }
@@ -220,6 +243,7 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-gray-200">
+
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-white shrink-0 flex-wrap">
         <div className="flex items-center gap-1">
@@ -242,45 +266,34 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
         </div>
 
         <div className="flex items-center gap-1 ml-1">
-          <button
-            onClick={handleUndo}
-            title={t("pizarra.tools.undo")}
-            aria-label={t("pizarra.tools.undo")}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-aula-ink-soft hover:bg-gray-100 transition-colors"
-          >
+          <button onClick={handleUndo} title={t("pizarra.tools.undo")} aria-label={t("pizarra.tools.undo")}
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-aula-ink-soft hover:bg-gray-100 transition-colors">
             <Undo2 className="w-4 h-4" />
           </button>
-          <button
-            onClick={handleClear}
-            title={t("pizarra.tools.clear")}
-            aria-label={t("pizarra.tools.clear")}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-aula-ink-soft hover:bg-gray-100 transition-colors"
-          >
+          <button onClick={handleClear} title={t("pizarra.tools.clear")} aria-label={t("pizarra.tools.clear")}
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-aula-ink-soft hover:bg-gray-100 transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex-1" />
 
-        {method === "native" && state === "confirming" && (
+        {state === "confirming" && method === "native" && (
           <span className="text-xs text-aula-green font-medium">{t("pizarra.nativeApi")}</span>
         )}
-        {method === "tesseract" && state === "confirming" && (
-          <span className="text-xs text-aula-ink-soft">{t("pizarra.tesseractFallback")}</span>
+        {state === "confirming" && method === "gemini" && (
+          <span className="text-xs text-aula-green font-medium">{t("pizarra.gemini")}</span>
         )}
 
         {onCancel && (
-          <button
-            onClick={onCancel}
-            className="text-aula-ink-soft hover:text-aula-ink p-1 transition-colors"
-            aria-label={t("common.close")}
-          >
+          <button onClick={onCancel} className="text-aula-ink-soft hover:text-aula-ink p-1 transition-colors"
+            aria-label={t("common.close")}>
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* Canvas area */}
+      {/* Canvas */}
       <div ref={containerRef} className="flex-1 min-h-0 relative" style={{ touchAction: "none" }}>
         <canvas
           ref={canvasRef}
@@ -296,15 +309,19 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
 
       {/* Bottom panel */}
       <div className="shrink-0 border-t bg-white px-4 py-3">
+
         {state === "idle" && (
-          <Button
-            onClick={() => { void handleSolve(); }}
-            disabled={!hasStrokes}
-            className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white rounded-xl gap-2"
-          >
-            <Pencil className="w-4 h-4" />
-            {t("pizarra.solve")}
-          </Button>
+          hasStrokes ? (
+            <Button
+              onClick={() => { void handleSolve(); }}
+              className="w-full bg-aula-blue hover:bg-aula-blue-dark text-white rounded-xl gap-2"
+            >
+              <Pencil className="w-4 h-4" />
+              {t("pizarra.solve")}
+            </Button>
+          ) : (
+            <p className="text-xs text-center text-aula-ink-soft py-1">{t("pizarra.empty")}</p>
+          )
         )}
 
         {state === "recognizing" && (
@@ -333,11 +350,7 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
                 <Check className="w-3.5 h-3.5" />
                 {t("pizarra.confirm.yes")}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setState("idle")}
-                className="gap-1.5 rounded-xl"
-              >
+              <Button variant="outline" onClick={() => setState("idle")} className="gap-1.5 rounded-xl">
                 {t("pizarra.confirm.cancel")}
               </Button>
             </div>
@@ -346,24 +359,41 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
 
         {state === "error" && (
           <div className="space-y-2">
-            <p className="text-sm text-aula-red">{t("pizarra.error.noText")}</p>
-            <p className="text-xs text-aula-ink-soft">{t("pizarra.error.hint")}</p>
+            {noApiKey ? (
+              <p className="text-xs font-semibold text-aula-red">
+                {t("pizarra.error.noApiKey")}{" "}
+                <Link href="/settings" className="underline text-aula-blue">{t("nav.settings")}</Link>
+              </p>
+            ) : (
+              <p className="text-xs font-semibold text-aula-red">{t("pizarra.error.noText")}</p>
+            )}
+            <p className="text-xs text-aula-ink-soft">{t("pizarra.error.typeManual")}</p>
+            <textarea
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
+              placeholder={t("pizarra.error.placeholder")}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-aula-blue"
+              rows={2}
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+            />
             <div className="flex gap-2 flex-wrap">
               <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setState("idle")}
-                className="rounded-xl"
+                onClick={handleConfirm}
+                disabled={!editedText.trim()}
+                className="flex-1 bg-aula-blue hover:bg-aula-blue-dark text-white rounded-xl gap-1.5"
               >
+                <Check className="w-3.5 h-3.5" />
+                {t("pizarra.confirm.yes")}
+              </Button>
+              <Button variant="outline" size="sm"
+                onClick={() => { setEditedText(""); setState("idle"); }}
+                className="rounded-xl">
                 {t("common.retry")}
               </Button>
               {onCloudBoost && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCloudBoost}
-                  className="rounded-xl text-aula-blue border-aula-blue/30"
-                >
+                <Button size="sm" variant="outline" onClick={handleCloudBoost}
+                  className="rounded-xl text-aula-blue border-aula-blue/30">
                   {t("pizarra.error.cloudOpt")}
                 </Button>
               )}

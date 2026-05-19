@@ -1,5 +1,3 @@
-import { extractTextFromImage } from "@/lib/ocr/localOcr";
-
 // ─── Native Handwriting Recognition API (Chrome experimental) ─────────────────
 // Not in standard lib.dom.d.ts — declared here.
 
@@ -22,9 +20,7 @@ interface HWRecognizer {
   finish(): void;
 }
 type HWNav = typeof navigator & {
-  createHandwritingRecognizer(
-    c: { languages: string[] }
-  ): Promise<HWRecognizer>;
+  createHandwritingRecognizer(c: { languages: string[] }): Promise<HWRecognizer>;
 };
 
 function hasNativeAPI(): boolean {
@@ -36,35 +32,39 @@ function hasNativeAPI(): boolean {
 
 export interface HandwritingResult {
   text:   string;
-  method: "native" | "tesseract" | "failed";
+  method: "native" | "gemini" | "failed";
 }
 
 export interface StrokePoint { x: number; y: number; t: number }
 
 /**
- * Recognize handwritten strokes using the native API → Tesseract fallback.
+ * Recognize handwritten strokes.
  *
- * @param strokes - Array of stroke point sequences (for native API)
- * @param canvasDataUrl - Rasterized canvas image (for Tesseract fallback)
- * @param lang - "es" | "en"
+ * Cascade:
+ *   1. Chrome Native Handwriting API — requires experimental Chrome flag
+ *   2. Gemini (Google AI Studio) — same API key used for Cloud Boost; reads any handwriting
+ *   3. "failed" — caller shows a manual-input textarea
+ *
+ * @param strokes       Stroke sequences for the native API
+ * @param canvasDataUrl Canvas image for Gemini
+ * @param lang          "es" | "en"
+ * @param apiKey        Google AI Studio key (from localStorage); if absent, skips Gemini
  */
 export async function recognizeHandwriting(
   strokes: StrokePoint[][],
   canvasDataUrl: string,
   lang: "es" | "en" = "es",
+  apiKey?: string,
 ): Promise<HandwritingResult> {
-  // Step 1 — Native Handwriting Recognition API
+
+  // ── Step 1: Chrome Native Handwriting API ──────────────────────────────────
   if (hasNativeAPI() && strokes.length > 0) {
     try {
-      const nav = navigator as HWNav;
+      const nav        = navigator as HWNav;
       const recognizer = await nav.createHandwritingRecognizer({
         languages: [lang === "es" ? "es" : "en"],
       });
-
-      const drawing = recognizer.startDrawing({
-        recognitionType: "text",
-        alternatives:    3,
-      });
+      const drawing = recognizer.startDrawing({ recognitionType: "text", alternatives: 3 });
 
       for (const strokePoints of strokes) {
         const stroke = drawing.createStroke();
@@ -77,25 +77,23 @@ export async function recognizeHandwriting(
       recognizer.finish();
 
       const text = predictions[0]?.text?.trim() ?? "";
-      if (text.length > 0) {
-        return { text, method: "native" };
-      }
+      if (text.length > 0) return { text, method: "native" };
     } catch {
-      // Native API failed — fall through to Tesseract
+      // Native API failed — fall through
     }
   }
 
-  // Step 2 — Tesseract.js fallback
-  try {
-    const tesseractLang = lang === "es" ? "spa" : "eng";
-    const text = await extractTextFromImage(canvasDataUrl, tesseractLang);
-    if (text.length > 0) {
-      return { text, method: "tesseract" };
+  // ── Step 2: Gemini — reads any handwriting, uses same key as Cloud Boost ───
+  if (apiKey) {
+    try {
+      const { transcribeHandwriting } = await import("@/lib/handwriting/geminiTranscribe");
+      const text = await transcribeHandwriting(canvasDataUrl, apiKey);
+      if (text.length > 0) return { text, method: "gemini" };
+    } catch {
+      // Network error or quota — fall through to manual input
     }
-  } catch {
-    // Tesseract failed — fall through
   }
 
-  // Step 3 — Both failed
+  // ── Step 3: All engines failed → show manual textarea ─────────────────────
   return { text: "", method: "failed" };
 }

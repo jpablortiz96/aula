@@ -106,7 +106,7 @@ export class MediaPipeEngine implements ChatEngine {
             delegate: "GPU",
             gpuOptions: { device },
           },
-          maxTokens: 1024,
+          maxTokens: 2048,
           topK: 40,
           temperature: 0.7,
           randomSeed: 42,
