@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useI18nStore, type Lang } from "@/store/i18nStore";
 import { useChatSettingsStore } from "@/store/chatSettingsStore";
+import { useAccessibilityStore, type TextSize, type TtsSpeed } from "@/store/accessibilityStore";
 import { useT } from "@/hooks/useT";
 import Link from "next/link";
 
@@ -20,6 +21,14 @@ export default function SettingsPage() {
     useEngineStore();
   const { lang, setLang }      = useI18nStore();
   const { socraticMode, setSocraticMode } = useChatSettingsStore();
+  const {
+    easyReading, setEasyReading,
+    textSize, setTextSize,
+    highContrast, setHighContrast,
+    reduceMotion, setReduceMotion,
+    autoReadTTS, setAutoReadTTS,
+    ttsSpeed, setTtsSpeed,
+  } = useAccessibilityStore();
 
   const [localEngine,      setLocalEngine]      = useState<EngineSelection>(selectedEngineId);
   const [localKey,         setLocalKey]         = useState(apiKey);
@@ -143,6 +152,88 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Accessibility */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-heading">{t("settings.accessibility.title")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ToggleRow
+              label={t("settings.accessibility.easyReading")}
+              desc={t("settings.accessibility.easyReading.desc")}
+              checked={easyReading}
+              onChange={setEasyReading}
+            />
+            <ToggleRow
+              label={t("settings.accessibility.highContrast")}
+              desc={t("settings.accessibility.highContrast.desc")}
+              checked={highContrast}
+              onChange={setHighContrast}
+            />
+            <ToggleRow
+              label={t("settings.accessibility.reduceMotion")}
+              desc={t("settings.accessibility.reduceMotion.desc")}
+              checked={reduceMotion}
+              onChange={setReduceMotion}
+            />
+
+            {/* Text size */}
+            <div>
+              <p className="text-sm font-medium text-aula-ink mb-2">{t("settings.accessibility.textSize")}</p>
+              <div className="flex gap-2">
+                {(["normal", "large", "xl"] as TextSize[]).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setTextSize(size)}
+                    aria-pressed={textSize === size}
+                    className={`flex-1 rounded-xl border py-1.5 text-sm font-medium transition-colors ${
+                      textSize === size
+                        ? "border-aula-blue bg-blue-50 text-aula-blue"
+                        : "border-gray-200 text-aula-ink-soft hover:bg-gray-50"
+                    }`}
+                  >
+                    {t(`settings.accessibility.textSize.${size}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* TTS */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-heading">{t("settings.tts.title")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ToggleRow
+              label={t("settings.tts.autoRead")}
+              desc=""
+              checked={autoReadTTS}
+              onChange={setAutoReadTTS}
+            />
+            <div>
+              <p className="text-sm font-medium text-aula-ink mb-2">{t("settings.tts.speed")}</p>
+              <div className="flex gap-2">
+                {(["slow", "normal", "fast"] as TtsSpeed[]).map((speed) => (
+                  <button
+                    key={speed}
+                    onClick={() => setTtsSpeed(speed)}
+                    aria-pressed={ttsSpeed === speed}
+                    className={`flex-1 rounded-xl border py-1.5 text-sm font-medium transition-colors ${
+                      ttsSpeed === speed
+                        ? "border-aula-blue bg-blue-50 text-aula-blue"
+                        : "border-gray-200 text-aula-ink-soft hover:bg-gray-50"
+                    }`}
+                  >
+                    {t(`settings.tts.speed.${speed}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Engine Selection */}
         <Card>
           <CardHeader className="pb-2">
@@ -246,6 +337,41 @@ export default function SettingsPage() {
           <RamInfo />
         </div>
       </div>
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-aula-ink">{label}</p>
+        {desc && <p className="text-xs text-aula-ink-soft mt-0.5">{desc}</p>}
+      </div>
+      <button
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-2 focus-visible:outline-aula-blue ${
+          checked ? "bg-aula-blue" : "bg-gray-200"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
     </div>
   );
 }

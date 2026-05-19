@@ -223,6 +223,41 @@
   transition: width 0.6s ease;
 }
 
+/* ── Accessibility: text size ────────────────────── */
+html.aula-text-large  body { font-size: 1.125rem; line-height: 1.75; }
+html.aula-text-xl     body { font-size: 1.25rem;  line-height: 1.85; letter-spacing: 0.01em; }
+
+/* ── Accessibility: high contrast ───────────────── */
+html.aula-high-contrast {
+  --color-aula-ink:       #000000;
+  --color-aula-ink-soft:  #333333;
+  --color-aula-bg:        #FFFFFF;
+  --color-aula-surface:   #FFFFFF;
+  --color-aula-border:    #000000;
+  --aula-ink:             #000000;
+  --aula-ink-soft:        #333333;
+}
+html.aula-high-contrast .bg-aula-bg  { background-color: #FFFFFF; }
+html.aula-high-contrast .border-aula-border { border-color: #000000; }
+html.aula-high-contrast .text-aula-ink-soft { color: #333333; }
+
+/* ── Accessibility: reduce motion ───────────────── */
+html.aula-reduce-motion *,
+html.aula-reduce-motion *::before,
+html.aula-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ── Easy reading: wider line spacing in chat ────── */
+html.aula-easy-reading .prose,
+html.aula-easy-reading p {
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  word-spacing: 0.05em;
+}
+
 /* ── Bubble pop-in ───────────────────────────────── */
 @keyframes bubble-in {
   from { transform: scale(0.92) translateY(6px); opacity: 0; }

@@ -14,7 +14,13 @@ export interface UseSpeechSynthesisReturn {
 const VOICE_PRIORITY_ES = ["es-CO", "es-MX", "es-US", "es-ES", "es-"];
 const VOICE_PRIORITY_EN = ["en-US", "en-GB", "en-AU", "en-"];
 
-export function useSpeechSynthesis(lang: Lang = "es"): UseSpeechSynthesisReturn {
+const TTS_RATES: Record<string, number> = {
+  slow:   0.6,
+  normal: 0.92,
+  fast:   1.4,
+};
+
+export function useSpeechSynthesis(lang: Lang = "es", speedKey: string = "normal"): UseSpeechSynthesisReturn {
   const [speaking, setSpeaking] = useState(false);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const supported = typeof window !== "undefined" && "speechSynthesis" in window;
@@ -47,7 +53,7 @@ export function useSpeechSynthesis(lang: Lang = "es"): UseSpeechSynthesisReturn 
     const utt = new SpeechSynthesisUtterance(cleaned);
     if (voiceRef.current) utt.voice = voiceRef.current;
     utt.lang  = bcp47;
-    utt.rate  = 0.92;
+    utt.rate  = TTS_RATES[speedKey] ?? 0.92;
     utt.onstart = () => setSpeaking(true);
     utt.onend   = () => setSpeaking(false);
     utt.onerror = () => setSpeaking(false);

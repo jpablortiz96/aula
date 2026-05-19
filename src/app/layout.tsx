@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Nunito } from "next/font/google";
 import "./globals.css";
+import { AccessibilityProvider } from "@/components/AccessibilityProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -41,6 +42,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <AccessibilityProvider />
         {children}
       </body>
     </html>

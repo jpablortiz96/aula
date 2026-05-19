@@ -11,6 +11,7 @@ import type { ChatEngine, ChatMessage, EngineCapabilities, EngineId } from "@/en
 import type { ModelStatus } from "@/lib/constants";
 import { useI18nStore } from "@/store/i18nStore";
 import { useChatSettingsStore } from "@/store/chatSettingsStore";
+import { useAccessibilityStore } from "@/store/accessibilityStore";
 
 function createEngine(id: EngineId): ChatEngine {
   switch (id) {
@@ -22,15 +23,23 @@ function createEngine(id: EngineId): ChatEngine {
 
 // ─── System prompts ───────────────────────────────────────────────────────────
 
-function buildSystemPrompt(lang: "es" | "en", socratic: boolean): string {
+function buildSystemPrompt(lang: "es" | "en", socratic: boolean, easyReading: boolean): string {
+  const easyNote =
+    lang === "en"
+      ? " Use very short sentences. Avoid technical jargon. Use bullet points and simple words. Max 2 emojis."
+      : " Usa frases muy cortas. Evita la jerga técnica. Usa viñetas y palabras simples. Máximo 2 emojis.";
+
   if (lang === "en") {
-    return socratic
+    const base = socratic
       ? "You are AULA in Socratic mode. NEVER give the final answer directly. Ask ONE guiding question at a time to help the student reason by themselves. If they are close, encourage them. If they go off track, redirect with another question. Only confirm when the student states the correct answer. Be warm and patient. Keep messages short. Respond in English."
-      : "You are AULA, an AI tutor for secondary school students. Respond in clear, simple English. Use markdown and LaTeX ($...$ inline, $$...$$ display). Maximum 200 words. Maximum 2 emojis.";
+      : "You are AULA, an AI tutor for secondary school students. Respond in clear, simple English. Use markdown and LaTeX ($...$ inline, $$...$$ display). Be thorough but concise. Maximum 2 emojis.";
+    return easyReading ? base + easyNote : base;
   }
-  return socratic
+
+  const base = socratic
     ? "Eres AULA en modo socrático. NUNCA des la respuesta final directamente. Haz UNA pregunta guía a la vez que ayude al estudiante a razonar por sí mismo. Si se acerca, anímalo. Si se desvía, redirige con otra pregunta. Solo confirma la respuesta cuando el estudiante la diga correctamente. Sé cálido y paciente. Mensajes cortos. Responde en español."
-    : "Eres AULA, un tutor para estudiantes de secundaria en Latinoamérica. Responde en español neutro latinoamericano. Usa markdown y LaTeX ($...$ inline, $$...$$ display). Máximo 200 palabras. Máximo 2 emojis.";
+    : "Eres AULA, un tutor para estudiantes de secundaria en Latinoamérica. Responde en español neutro latinoamericano. Usa markdown y LaTeX ($...$ inline, $$...$$ display). Sé completo pero conciso. Máximo 2 emojis.";
+  return easyReading ? base + easyNote : base;
 }
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -113,8 +122,9 @@ export function useChatEngine(): UseChatEngineReturn {
     if (!engineRef.current || status !== "ready") return;
 
     // Read current language + mode from stores (works outside React render cycle)
-    const lang     = useI18nStore.getState().lang;
-    const socratic = useChatSettingsStore.getState().socraticMode;
+    const lang        = useI18nStore.getState().lang;
+    const socratic    = useChatSettingsStore.getState().socraticMode;
+    const easyReading = useAccessibilityStore.getState().easyReading;
 
     const hasImages = (images?.length ?? 0) > 0;
     const needsCloudFallback = hasImages && !engineRef.current.capabilities.supportsMultimodal;
@@ -151,7 +161,7 @@ export function useChatEngine(): UseChatEngineReturn {
 
     const systemMsg: ChatMessage = {
       role: "system",
-      content: buildSystemPrompt(lang, socratic),
+      content: buildSystemPrompt(lang, socratic, easyReading),
     };
 
     const history: ChatMessage[] = useChatStore.getState().messages
@@ -168,7 +178,7 @@ export function useChatEngine(): UseChatEngineReturn {
 
     void genEngine
       .generate(messages, {
-        maxTokens: 2048,
+        maxTokens: 4096,
         temperature: 0.7,
         onToken: (token) => {
           const now = performance.now();

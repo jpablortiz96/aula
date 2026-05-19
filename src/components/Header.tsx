@@ -108,8 +108,9 @@ export function Header({ resolvedEngineId, cloudForImage, onMenuClick }: HeaderP
 
       {/* Nav */}
       <nav className="flex items-center gap-2" aria-label="Navegación principal">
-        {navLink("/chat",    "nav.chat")}
-        {navLink("/teacher", "nav.teacher")}
+        {navLink("/chat",     "nav.chat")}
+        {navLink("/practice", "nav.practice")}
+        {navLink("/teacher",  "nav.teacher")}
         <Link
           href="/logros"
           className={`transition-colors p-1 rounded focus-visible:outline-2 focus-visible:outline-aula-blue ${

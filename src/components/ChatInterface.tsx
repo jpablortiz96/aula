@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { Mic, MicOff, Headphones, Volume2, Send, Square, Pencil, Check, Loader2, X } from "lucide-react";
+import { Mic, MicOff, Headphones, Volume2, Send, Square, Pencil, Check, Loader2, X, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +25,9 @@ import { useChatSettingsStore } from "@/store/chatSettingsStore";
 import { type ModelStatus } from "@/lib/constants";
 import { useChatStore, type MessageMeta } from "@/store/chatStore";
 import { useProgressStore } from "@/store/progressStore";
+import { useAccessibilityStore } from "@/store/accessibilityStore";
 import { extractTextFromImage } from "@/lib/ocr/localOcr";
+import { generateIllustration } from "@/lib/illustrate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,7 @@ function AssistantBubble({
   streaming,
   onSpeak,
   onSimplify,
+  onIllustrate,
   simplifyLevel,
   meta,
 }: {
@@ -80,12 +83,31 @@ function AssistantBubble({
   streaming?: boolean;
   onSpeak?: () => void;
   onSimplify?: (level: number) => void;
+  onIllustrate?: () => Promise<string>;
   simplifyLevel: number;
   meta?: MessageMeta;
 }) {
   const t = useT();
   const maxLevel = 3;
   const canSimplify = !streaming && onSimplify && simplifyLevel < maxLevel;
+
+  const [illustration,    setIllustration]    = useState<string | null>(null);
+  const [illustrating,    setIllustrating]    = useState(false);
+  const [illustrateError, setIllustrateError] = useState<string | null>(null);
+
+  async function handleIllustrate() {
+    if (!onIllustrate || illustrating) return;
+    setIllustrating(true);
+    setIllustrateError(null);
+    try {
+      const svg = await onIllustrate();
+      setIllustration(svg);
+    } catch (err) {
+      setIllustrateError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIllustrating(false);
+    }
+  }
 
   return (
     <div className="max-w-[85%]">
@@ -109,8 +131,24 @@ function AssistantBubble({
         </ReactMarkdown>
         {streaming && <span className="aula-cursor" aria-hidden="true" />}
       </div>
+
+      {/* Illustration */}
+      {illustration && (
+        <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
+          <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")}</p>
+          <div
+            className="w-full"
+            dangerouslySetInnerHTML={{ __html: illustration }}
+            aria-label={t("illustrator.badge")}
+          />
+        </div>
+      )}
+      {illustrateError && (
+        <p className="text-[10px] text-aula-red mt-1 ml-1">{t("illustrator.error")}</p>
+      )}
+
       {!streaming && (
-        <div className="flex items-center gap-2 mt-1 ml-2">
+        <div className="flex items-center gap-2 mt-1 ml-2 flex-wrap">
           {onSpeak && (
             <button
               onClick={onSpeak}
@@ -133,6 +171,19 @@ function AssistantBubble({
                   ? t("chatInterface.noEntendi")
                   : t("chatInterface.noEntendi.level", { level: simplifyLevel + 1 })}
               </span>
+            </button>
+          )}
+          {onIllustrate && !illustration && (
+            <button
+              onClick={() => { void handleIllustrate(); }}
+              disabled={illustrating}
+              className="flex items-center gap-1 text-[11px] text-aula-ink-soft hover:text-aula-blue transition-colors disabled:opacity-50"
+              aria-label={t("illustrator.button")}
+            >
+              {illustrating
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Palette className="w-3 h-3" />}
+              <span>{illustrating ? t("illustrator.generating") : t("illustrator.button")}</span>
             </button>
           )}
         </div>
@@ -303,14 +354,22 @@ export function ChatInterface({
   const deferredStreamText = useDeferredValue(streamedText);
 
   // Progress store
-  const addQuestion       = useProgressStore((s) => s.addQuestion);
-  const recordCameraUsed  = useProgressStore((s) => s.recordCameraUsed);
-  const recordVoiceUsed   = useProgressStore((s) => s.recordVoiceUsed);
-  const recordWbUsed      = useProgressStore((s) => s.recordWhiteboardUsed);
-  const checkSimplify     = useProgressStore((s) => s.checkSimplifyCount);
+  const addQuestion         = useProgressStore((s) => s.addQuestion);
+  const recordCameraUsed    = useProgressStore((s) => s.recordCameraUsed);
+  const recordVoiceUsed     = useProgressStore((s) => s.recordVoiceUsed);
+  const recordWbUsed        = useProgressStore((s) => s.recordWhiteboardUsed);
+  const checkSimplify       = useProgressStore((s) => s.checkSimplifyCount);
+  const recordIllustrator   = useProgressStore((s) => s.recordIllustratorUsed);
+
+  // Accessibility
+  const { autoReadTTS, ttsSpeed } = useAccessibilityStore();
+
+  const apiKey = typeof window !== "undefined"
+    ? (localStorage.getItem("aula:google-ai-api-key") ?? "")
+    : "";
 
   // Voice
-  const { speak,  supported: ttsSupported } = useSpeechSynthesis(lang);
+  const { speak, supported: ttsSupported } = useSpeechSynthesis(lang, ttsSpeed);
   const { isListening, interimTranscript, supported: sttSupported, start: startListening, stop: stopListening } =
     useSpeechRecognition((final) => setInput((prev) => prev ? `${prev} ${final}` : final), lang);
 
@@ -319,16 +378,16 @@ export function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamedText]);
 
-  // Hands-free: auto-speak new assistant messages
+  // Auto-speak new assistant messages when hands-free or autoReadTTS is on
   const prevMsgCountRef = useRef<number | null>(null);
   useEffect(() => {
     if (prevMsgCountRef.current === null) { prevMsgCountRef.current = messages.length; return; }
-    if (handsFree && messages.length > prevMsgCountRef.current) {
+    if ((handsFree || autoReadTTS) && messages.length > prevMsgCountRef.current) {
       const last = messages[messages.length - 1];
       if (last?.role === "assistant") speak(last.content);
     }
     prevMsgCountRef.current = messages.length;
-  }, [messages, handsFree, speak]);
+  }, [messages, handsFree, autoReadTTS, speak]);
 
   // ── Send logic ───────────────────────────────────────────────────────────────
 
@@ -543,6 +602,10 @@ export function ChatInterface({
                     simplifyLevel={simplifyLevels[msg.id] ?? 0}
                     onSpeak={ttsSupported ? () => speak(msg.content) : undefined}
                     onSimplify={isReady ? (lvl) => handleSimplify(msg.id, msg.content, lvl) : undefined}
+                    onIllustrate={apiKey ? async () => {
+                      recordIllustrator();
+                      return generateIllustration(msg.content, lang, apiKey);
+                    } : undefined}
                   />
                 )}
               </div>
