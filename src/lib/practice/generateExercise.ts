@@ -9,6 +9,48 @@ export interface Exercise {
   explanation: string;
 }
 
+// ── Prompt builders ───────────────────────────────────────────────────────────
+
+function buildExercisePrompt(
+  topic: string,
+  diffLabel: string,
+  lang: "es" | "en",
+  isRetry: boolean,
+): string {
+  if (isRetry) {
+    // Stricter prompt for second attempt
+    return lang === "es"
+      ? `Tu respuesta anterior no fue JSON válido. Intenta de nuevo.
+RESPONDE ÚNICAMENTE con un objeto JSON. Nada antes. Nada después. Sin markdown.
+
+{"question":"[pregunta de nivel ${diffLabel} sobre ${topic}]","answer":"[respuesta correcta]","explanation":"[explicación breve]"}`
+      : `Your previous response was not valid JSON. Try again.
+REPLY ONLY with a JSON object. Nothing before. Nothing after. No markdown.
+
+{"question":"[${diffLabel} question about ${topic}]","answer":"[correct answer]","explanation":"[brief explanation]"}`;
+  }
+
+  return lang === "es"
+    ? `Eres un generador de ejercicios educativos. Tu única tarea es producir UN objeto JSON válido.
+
+REGLAS ABSOLUTAS:
+- Responde ÚNICAMENTE con el JSON. Nada antes ni después. Sin texto extra. Sin markdown.
+- Estructura exacta: {"question":"...","answer":"...","explanation":"..."}
+- No uses bloques de código. No pongas comentarios. No expliques nada fuera del JSON.
+
+Tema: "${topic}". Nivel: ${diffLabel}.`
+    : `You are an educational exercise generator. Your only job is to produce ONE valid JSON object.
+
+ABSOLUTE RULES:
+- Reply ONLY with the JSON. Nothing before or after. No extra text. No markdown.
+- Exact structure: {"question":"...","answer":"...","explanation":"..."}
+- No code blocks. No comments. No explanations outside the JSON.
+
+Topic: "${topic}". Level: ${diffLabel}.`;
+}
+
+// ── Main functions ────────────────────────────────────────────────────────────
+
 export async function generateExercise(
   topic: string,
   difficulty: Difficulty,
@@ -19,28 +61,39 @@ export async function generateExercise(
       ? { easy: "fácil", medium: "medio", hard: "difícil" }[difficulty]
       : difficulty;
 
-  const prompt =
-    lang === "es"
-      ? `Genera un ejercicio de práctica de nivel ${diffLabel} sobre: "${topic}".
-Responde ÚNICAMENTE con JSON válido (sin texto extra ni markdown):
-{"question":"...","answer":"...","explanation":"..."}`
-      : `Generate a ${diffLabel} practice exercise about: "${topic}".
-Reply ONLY with valid JSON (no extra text or markdown):
-{"question":"...","answer":"...","explanation":"..."}`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prompt = buildExercisePrompt(topic, diffLabel, lang, attempt > 0);
 
-  const raw = await generateText(prompt, { maxTokens: 400, temperature: 0.8 });
-  if (!raw) throw new Error("Model returned empty response");
+    let raw: string;
+    try {
+      raw = await generateText(prompt, { maxTokens: 300, temperature: 0.35 });
+    } catch (err) {
+      // Engine errors (no engine loaded, network, etc.) — not retried, bubble up
+      throw err;
+    }
 
-  const parsed = extractJson(raw) as Partial<Exercise>;
-  if (!parsed.question || !parsed.answer) {
-    throw new Error("Model response missing required fields");
+    if (!raw?.trim()) continue;
+
+    try {
+      const parsed = extractJson(raw) as Partial<Exercise>;
+      if (parsed.question && parsed.answer) {
+        return {
+          question:    parsed.question,
+          answer:      parsed.answer,
+          explanation: parsed.explanation ?? "",
+        };
+      }
+    } catch {
+      // JSON extraction failed — retry once with stricter prompt
+    }
   }
 
-  return {
-    question:    parsed.question,
-    answer:      parsed.answer,
-    explanation: parsed.explanation ?? "",
-  };
+  // Both attempts failed — throw a user-friendly message
+  throw new Error(
+    lang === "es"
+      ? "No pude generar el ejercicio. Intenta con otro tema."
+      : "Could not generate an exercise. Try a different topic.",
+  );
 }
 
 export async function analyzeConceptualError(

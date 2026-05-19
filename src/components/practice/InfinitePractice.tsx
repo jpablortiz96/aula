@@ -93,7 +93,15 @@ export function InfinitePractice() {
       setPhase("question");
       setTimeout(() => answerRef.current?.focus(), 100);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const raw = err instanceof Error ? err.message : String(err);
+      // Show friendly message — never show raw stack or technical noise
+      const friendly =
+        raw.includes("No AI engine") || raw.includes("API key")
+          ? (lang === "es"
+              ? "Necesitas el modelo cargado o una API key para practicar."
+              : "You need the model loaded or an API key to practice.")
+          : raw;
+      setError(friendly);
       setPhase("setup");
     }
   }, [lang]);
@@ -173,7 +181,17 @@ export function InfinitePractice() {
         </div>
 
         {error && (
-          <p className="text-xs text-aula-red rounded-xl bg-aula-red/10 px-3 py-2">{error}</p>
+          <div className="rounded-xl bg-aula-red/10 border border-aula-red/20 px-3 py-2.5 flex items-start justify-between gap-3">
+            <p className="text-xs text-aula-red leading-relaxed">{error}</p>
+            {topic.trim() && (
+              <button
+                onClick={handleStart}
+                className="text-xs font-semibold text-aula-red underline shrink-0"
+              >
+                {t("common.retry")}
+              </button>
+            )}
+          </div>
         )}
 
         <button
