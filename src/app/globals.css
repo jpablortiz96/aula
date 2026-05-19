@@ -59,6 +59,7 @@
   --color-aula-surface: #FFFFFF;
   --color-aula-ink: #202124;
   --color-aula-ink-soft: #5F6368;
+  --color-aula-border: oklch(0.922 0 0);
 }
 
 :root {
