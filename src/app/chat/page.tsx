@@ -165,7 +165,12 @@ function ChatPageInner() {
                   {isLoading && (
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{t("chat.loading")}</span>
+                        <span>
+                          {progress < 10  ? t("chat.status.wasm")
+                          : progress < 20 ? t("chat.status.gpu")
+                          : progress < 90 ? (progress < 25 ? t("chat.status.cache") : t("chat.status.download"))
+                          : t("chat.status.init")}
+                        </span>
                         <span>{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-2" />
