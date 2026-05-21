@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useT } from "@/hooks/useT";
@@ -13,7 +13,6 @@ import {
   type Exercise,
   type Difficulty,
 } from "@/lib/practice/generateExercise";
-import { getActiveEngine } from "@/engines/engineSingleton";
 
 // ─── Adaptive difficulty ──────────────────────────────────────────────────────
 
@@ -71,11 +70,6 @@ export function InfinitePractice() {
 
   const answerRef = useRef<HTMLTextAreaElement>(null);
 
-  // Abort any in-flight generation when the component unmounts (e.g. navigating away)
-  useEffect(() => {
-    return () => { getActiveEngine()?.abort(); };
-  }, []);
-
   const handleAnalyzeError = useCallback(async () => {
     if (!exercise || !userAnswer) return;
     setAnalyzingError(true);
@@ -106,13 +100,15 @@ export function InfinitePractice() {
     setErrorAnalysis(null);
     setShowErrorDetector(false);
 
+    const apiKey = localStorage.getItem("aula:google-ai-api-key") ?? "";
+
     const timeoutMsg = lang === "es"
       ? "La generación tardó demasiado. Intenta de nuevo."
       : "Generation timed out. Please try again.";
 
     try {
       const ex = await Promise.race([
-        generateExercise(currentTopic, currentDifficulty, lang, prevQuestions),
+        generateExercise({ apiKey, topic: currentTopic, difficulty: currentDifficulty, lang, previousQuestions: prevQuestions }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error(timeoutMsg)), 30_000)
         ),
@@ -127,11 +123,14 @@ export function InfinitePractice() {
       setTimeout(() => answerRef.current?.focus(), 100);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      const friendly =
-        raw.includes("No AI engine") || raw.includes("API key")
+      const friendly = raw.includes("401")
+        ? (lang === "es"
+            ? "API key inválida. Verifica tu clave en Configuración."
+            : "Invalid API key. Check your key in Settings.")
+        : raw.includes("429")
           ? (lang === "es"
-              ? "Necesitas el modelo cargado o una API key para practicar."
-              : "You need the model loaded or an API key to practice.")
+              ? "Límite de solicitudes alcanzado. Espera un momento e intenta de nuevo."
+              : "Rate limit reached. Wait a moment and try again.")
           : raw;
       setError(friendly);
       setPhase("setup");

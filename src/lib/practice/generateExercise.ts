@@ -1,4 +1,5 @@
 import { extractJson } from "@/lib/jsonExtract";
+import { cloudGenerate } from "@/lib/cloudNoStream";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -14,12 +15,12 @@ function buildSystemPrompt(lang: "es" | "en"): string {
   return lang === "es"
     ? `Eres un generador de ejercicios educativos. Cada vez que te pidan un ejercicio, generas UNO nuevo y completamente distinto al anterior. Varías: números, contexto, sub-tema, tipo de razonamiento (resolver / comparar / definir / aplicar / analizar).
 
-Respondes ÚNICAMENTE con un objeto JSON válido, sin texto alrededor, sin markdown, sin bloques de código:
-{"question":"...","answer":"...","explanation":"..."}`
-    : `You are an educational exercise generator. Every time you are asked for an exercise, you generate ONE new one that is completely different from the previous. You vary: numbers, context, sub-topic, type of reasoning (solve / compare / define / apply / analyze).
+Respondes ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin markdown, sin bloques de código:
+{"question":"...","answer":"...","hint":"..."}`
+    : `You are an educational exercise generator. Every time you are asked for an exercise, you generate ONE new one completely different from the previous. You vary: numbers, context, sub-topic, type of reasoning (solve / compare / define / apply / analyze).
 
 Reply ONLY with a valid JSON object, no surrounding text, no markdown, no code blocks:
-{"question":"...","answer":"...","explanation":"..."}`;
+{"question":"...","answer":"...","hint":"..."}`;
 }
 
 function buildUserPrompt(
@@ -32,14 +33,14 @@ function buildUserPrompt(
   const prevBlock =
     previousQuestions.length > 0
       ? lang === "es"
-        ? `\nYa generaste estas preguntas. NO las repitas ni hagas variaciones triviales (cambiar solo un número):\n${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
-        : `\nYou already generated these questions. Do NOT repeat them or make trivial variations (changing only one number):\n${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
+        ? `\nNO repitas ni hagas variaciones triviales de estas preguntas previas:\n${previousQuestions.slice(-5).map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
+        : `\nDo NOT repeat or make trivial variations of these previous questions:\n${previousQuestions.slice(-5).map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
       : "";
 
   const base =
     lang === "es"
-      ? `${prevBlock}Genera un ejercicio de nivel ${diffLabel} sobre: "${topic}"`
-      : `${prevBlock}Generate a ${diffLabel} exercise about: "${topic}"`;
+      ? `${prevBlock}Genera UN ejercicio nuevo de: ${topic}\nNivel: ${diffLabel}\nVariá: números, contexto, sub-tema, tipo de razonamiento.\nResponde solo el JSON.`
+      : `${prevBlock}Generate ONE new exercise about: ${topic}\nLevel: ${diffLabel}\nVary: numbers, context, sub-topic, type of reasoning.\nReply only with the JSON.`;
 
   if (!isRetry) return base;
 
@@ -48,23 +49,21 @@ function buildUserPrompt(
     : `${base}\n\nIMPORTANT: Reply ONLY with the JSON. No text before or after. No code blocks.`;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function getCloudEngine() {
-  const { CloudBoostEngine } = await import("@/engines/cloud-boost/CloudBoostEngine");
-  return new CloudBoostEngine();
-}
-
 // ── Main functions ────────────────────────────────────────────────────────────
 
-export async function generateExercise(
-  topic: string,
-  difficulty: Difficulty,
-  lang: "es" | "en",
-  previousQuestions: string[] = [],
-): Promise<Exercise> {
-  const cloud = await getCloudEngine();
-
+export async function generateExercise({
+  apiKey,
+  topic,
+  difficulty,
+  lang,
+  previousQuestions = [],
+}: {
+  apiKey:             string;
+  topic:              string;
+  difficulty:         Difficulty;
+  lang:               "es" | "en";
+  previousQuestions?: string[];
+}): Promise<Exercise> {
   const diffLabel =
     lang === "es"
       ? { easy: "fácil", medium: "medio", hard: "difícil" }[difficulty]
@@ -77,13 +76,13 @@ export async function generateExercise(
 
     let raw: string;
     try {
-      raw = await cloud.generate(
-        [
-          { role: "system", content: systemContent },
-          { role: "user",   content: userContent },
-        ],
-        { maxTokens: 400, temperature: attempt === 0 ? 0.8 : 0.2 },
-      );
+      raw = await cloudGenerate({
+        apiKey,
+        systemInstruction: systemContent,
+        prompt: userContent,
+        temperature: attempt === 0 ? 0.85 : 0.2,
+        maxOutputTokens: 512,
+      });
     } catch (err) {
       throw err;
     }
@@ -91,12 +90,12 @@ export async function generateExercise(
     if (!raw?.trim()) continue;
 
     try {
-      const parsed = extractJson(raw) as Partial<Exercise>;
+      const parsed = extractJson(raw) as Partial<{ question: string; answer: string; hint: string }>;
       if (parsed.question && parsed.answer) {
         return {
           question:    parsed.question,
           answer:      parsed.answer,
-          explanation: parsed.explanation ?? "",
+          explanation: parsed.hint ?? "",
         };
       }
     } catch {
@@ -117,7 +116,14 @@ export async function analyzeConceptualError(
   studentAnswer: string,
   lang: "es" | "en",
 ): Promise<string> {
-  const cloud = await getCloudEngine();
+  const apiKey =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("aula:google-ai-api-key")
+      : null;
+
+  if (!apiKey) {
+    return lang === "es" ? "No se pudo analizar el error." : "Could not analyze the error.";
+  }
 
   const prompt =
     lang === "es"
@@ -127,19 +133,16 @@ Pregunta: ${question}
 Respuesta correcta: ${correctAnswer}
 Respuesta del estudiante: ${studentAnswer}
 
-Identifica el error conceptual en la respuesta del estudiante en 2-3 frases. Sé amable y constructivo. No des la respuesta directamente; ayúdale a entender qué salió mal.`
+Identifica el error conceptual en 2-3 frases. Sé amable y constructivo. No des la respuesta directamente; ayúdale a entender qué salió mal.`
       : `A student answered this exercise incorrectly.
 
 Question: ${question}
 Correct answer: ${correctAnswer}
 Student's answer: ${studentAnswer}
 
-Identify the conceptual error in the student's answer in 2-3 sentences. Be kind and constructive. Don't give the answer directly; help them understand what went wrong.`;
+Identify the conceptual error in 2-3 sentences. Be kind and constructive. Don't give the answer directly; help them understand what went wrong.`;
 
-  const text = await cloud.generate(
-    [{ role: "user", content: prompt }],
-    { maxTokens: 200, temperature: 0.3 },
-  );
+  const text = await cloudGenerate({ apiKey, prompt, maxOutputTokens: 200, temperature: 0.3 });
   return text || (lang === "es" ? "No se pudo analizar el error." : "Could not analyze the error.");
 }
 
