@@ -1,51 +1,40 @@
 import { sanitizeSvg, isValidSvg } from "@/lib/svgSanitize";
+import { cloudGenerate } from "@/lib/cloudNoStream";
 
 const CLOUD_ONLY_ERROR_ES =
   "Las ilustraciones requieren Cloud Boost (API key de Google AI Studio). Agrégala en Configuración.";
 const CLOUD_ONLY_ERROR_EN =
   "Illustrations require Cloud Boost (Google AI Studio API key). Add it in Settings.";
 
-function buildSvgPrompt(conceptText: string, lang: "es" | "en"): string {
-  const snippet = conceptText.slice(0, 600);
-  return lang === "es"
-    ? `Genera un diagrama SVG educativo claro que ilustre el siguiente concepto:
+const SYSTEM_SVG_ES =
+  `Generas SVG educativo simple y claro.
+Reglas estrictas:
+- viewBox="0 0 400 300"
+- Solo elementos básicos: rect, circle, ellipse, line, path, text
+- Etiquetas <text> con font-size="14"
+- Máximo 5 colores sólidos
+- SIN gradientes, filtros ni animaciones
+- Responde SOLO el código SVG, empezando con <svg y terminando con </svg>, sin texto antes ni después.`;
 
-"${snippet}"
-
-REGLAS ESTRICTAS — sigue cada punto o el resultado será inválido:
-1. Responde ÚNICAMENTE con código SVG válido, comenzando exactamente con <svg y terminando con </svg>.
-2. Atributo obligatorio: viewBox="0 0 400 300". No uses width/height absolutos.
-3. Usa solo formas básicas: rect, circle, ellipse, line, polyline, polygon, path, text.
-4. Incluye etiquetas <text> legibles que expliquen los elementos visuales.
-5. Usa al menos 3 formas o grupos de elementos visuales distintos.
-6. Paleta máxima de 5 colores sólidos. Sin degradados, filtros, patrones ni animaciones.
-7. Sin imágenes externas, sin <script>, sin event handlers, sin <use> con hrefs externos.
-8. Sin markdown, sin explicaciones — SOLO el SVG.`
-    : `Generate a clear educational SVG diagram illustrating this concept:
-
-"${snippet}"
-
-STRICT RULES — follow every point or the result will be invalid:
-1. Reply ONLY with valid SVG code, starting exactly with <svg and ending with </svg>.
-2. Required attribute: viewBox="0 0 400 300". No absolute width/height.
-3. Use only basic shapes: rect, circle, ellipse, line, polyline, polygon, path, text.
-4. Include readable <text> labels explaining the visual elements.
-5. Use at least 3 distinct shapes or visual element groups.
-6. Maximum 5 solid colors. No gradients, filters, patterns, or animations.
-7. No external images, no <script>, no event handlers, no <use> with external hrefs.
-8. No markdown, no explanations — ONLY the SVG.`;
-}
+const SYSTEM_SVG_EN =
+  `You generate simple, clear educational SVG diagrams.
+Strict rules:
+- viewBox="0 0 400 300"
+- Only basic elements: rect, circle, ellipse, line, path, text
+- <text> labels with font-size="14"
+- Maximum 5 solid colors
+- NO gradients, filters, or animations
+- Reply ONLY with SVG code, starting with <svg and ending with </svg>, no text before or after.`;
 
 function hasMinimumVisualContent(svg: string): boolean {
   const shapeMatches = svg.match(/<(rect|circle|ellipse|line|polyline|polygon|path|text)\b/g) ?? [];
-  return shapeMatches.length >= 3 && svg.includes('viewBox');
+  return shapeMatches.length >= 3 && svg.includes("viewBox");
 }
 
 export async function generateIllustration(
   conceptText: string,
   lang: "es" | "en",
 ): Promise<string> {
-  // Illustrations always use Cloud Boost — local Gemma 4 E2B is too small for reliable SVG
   const apiKey =
     typeof localStorage !== "undefined"
       ? localStorage.getItem("aula:google-ai-api-key")
@@ -55,18 +44,30 @@ export async function generateIllustration(
     throw new Error(lang === "es" ? CLOUD_ONLY_ERROR_ES : CLOUD_ONLY_ERROR_EN);
   }
 
-  const { CloudBoostEngine } = await import("@/engines/cloud-boost/CloudBoostEngine");
-  const cloud = new CloudBoostEngine();
+  const prompt =
+    lang === "es"
+      ? `Ilustra de forma educativa: ${conceptText.slice(0, 600)}`
+      : `Illustrate educationally: ${conceptText.slice(0, 600)}`;
 
-  const instruction = buildSvgPrompt(conceptText, lang);
-  const raw = await cloud.generate(
-    [{ role: "user", content: instruction }],
-    { maxTokens: 1500, temperature: 0.2 },
-  );
+  const raw = await cloudGenerate({
+    apiKey,
+    systemInstruction: lang === "es" ? SYSTEM_SVG_ES : SYSTEM_SVG_EN,
+    prompt,
+    temperature: 0.6,
+    maxOutputTokens: 1500,
+  });
 
-  if (!raw) throw new Error(lang === "es" ? "Sin respuesta del modelo." : "Empty response from model.");
+  // Extract the <svg>...</svg> block from the response
+  const match = raw.match(/<svg[\s\S]*?<\/svg>/i);
+  if (!match) {
+    throw new Error(
+      lang === "es"
+        ? "No pude ilustrar este concepto bien. Intenta con otro mensaje."
+        : "Could not illustrate this concept. Try a different message.",
+    );
+  }
 
-  const sanitized = sanitizeSvg(raw);
+  const sanitized = sanitizeSvg(match[0]);
 
   if (!isValidSvg(sanitized)) {
     throw new Error(
