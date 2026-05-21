@@ -135,6 +135,11 @@ export class MediaPipeEngine implements ChatEngine {
   private abortResolve: ((text: string) => void) | null = null;
   private currentAccumulated = "";
 
+  // Serialization lock — MediaPipe only handles one invocation at a time
+  private isGenerating = false;
+  private generationDone: Promise<void> | null = null;
+  private generationDoneResolve: (() => void) | null = null;
+
   async isReady(): Promise<boolean> {
     if (this.llm) return true;
     if (!navigator.gpu) return false;
@@ -197,11 +202,39 @@ export class MediaPipeEngine implements ChatEngine {
     this.aborted = true;
     this.abortResolve?.(this.currentAccumulated);
     this.abortResolve = null;
+    // isGenerating stays true until the underlying MediaPipe call finishes naturally
+  }
+
+  /**
+   * Force-clears the serialization lock. Use only as a last resort when the
+   * engine appears stuck (e.g. "Previous invocation still ongoing" keeps firing).
+   * The underlying MediaPipe call may still be running, so the next generate()
+   * could theoretically collide — but it will retry once automatically.
+   */
+  forceReset(): void {
+    this.aborted = true;
+    this.abortResolve?.(this.currentAccumulated);
+    this.abortResolve = null;
+    this.isGenerating = false;
+    this.generationDoneResolve?.();
+    this.generationDoneResolve = null;
+    this.generationDone = null;
   }
 
   async generate(messages: ChatMessage[], opts: GenerateOptions): Promise<string> {
     if (!this.llm) throw new Error("Engine not loaded — call load() first.");
 
+    // Wait for any in-flight MediaPipe call to finish before starting a new one.
+    // abort() resolves the caller's promise early but doesn't stop MediaPipe;
+    // we must wait for the raw completion to avoid "Previous invocation" errors.
+    if (this.isGenerating && this.generationDone) {
+      try { await this.generationDone; } catch { /* proceed regardless */ }
+    }
+
+    this.isGenerating = true;
+    this.generationDone = new Promise<void>((resolve) => {
+      this.generationDoneResolve = resolve;
+    });
     this.aborted = false;
     this.currentAccumulated = "";
 
@@ -211,6 +244,12 @@ export class MediaPipeEngine implements ChatEngine {
       this.abortResolve = resolve;
     });
 
+    const unlock = () => {
+      this.isGenerating = false;
+      this.generationDoneResolve?.();
+      this.generationDoneResolve = null;
+    };
+
     const generatePromise = this.llm
       .generateResponse(prompt, (partial: string, _done: boolean) => {
         if (this.aborted) return;
@@ -219,7 +258,17 @@ export class MediaPipeEngine implements ChatEngine {
       })
       .then(() => {
         this.abortResolve = null;
+        unlock();
         return stripControlTokens(this.currentAccumulated);
+      })
+      .catch((err: unknown) => {
+        unlock();
+        const msg = err instanceof Error ? err.message : String(err);
+        // Wrap with a hint so callers can detect and offer recovery
+        if (msg.includes("Previous invocation") || msg.includes("still ongoing")) {
+          throw new Error(`[MediaPipe-busy] ${msg}`);
+        }
+        throw err;
       });
 
     return Promise.race([generatePromise, abortPromise]);

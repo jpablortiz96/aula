@@ -29,4 +29,5 @@ export interface ChatEngine {
   generate(messages: ChatMessage[], opts: GenerateOptions): Promise<string>;
   unload?(): Promise<void>;
   abort(): void;
+  forceReset?(): void;
 }

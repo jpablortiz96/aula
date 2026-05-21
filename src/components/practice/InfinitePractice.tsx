@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useI18nStore } from "@/store/i18nStore";
@@ -69,6 +69,11 @@ export function InfinitePractice() {
   const [showErrorDetector,  setShowErrorDetector]  = useState(false);
 
   const answerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Abort any in-flight generation when the component unmounts (e.g. navigating away)
+  useEffect(() => {
+    return () => { getActiveEngine()?.abort(); };
+  }, []);
 
   const handleAnalyzeError = useCallback(async () => {
     if (!exercise || !userAnswer) return;

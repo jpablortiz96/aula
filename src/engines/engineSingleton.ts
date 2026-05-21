@@ -10,6 +10,10 @@ export function getActiveEngine(): ChatEngine | null {
   return _active;
 }
 
+export function forceResetEngine(): void {
+  _active?.forceReset?.();
+}
+
 /**
  * Generate text using the best available engine.
  * Priority: loaded active engine (MediaPipe or Cloud Boost) → Cloud Boost on demand.
