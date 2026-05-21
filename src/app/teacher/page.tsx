@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, FileText } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { extractJson } from "@/lib/jsonExtract";
+import { exportQuizToPdf } from "@/lib/pdfExport";
 import { useProgressStore } from "@/store/progressStore";
 import { useT } from "@/hooks/useT";
 import { useI18nStore } from "@/store/i18nStore";
@@ -229,6 +230,18 @@ export default function TeacherPage() {
     URL.revokeObjectURL(url);
   }
 
+  function exportPdf(includeAnswers: boolean) {
+    if (!quiz) return;
+    exportQuizToPdf({
+      title:          includeAnswers ? t("teacher.pdf.titleTeacher") : t("teacher.pdf.titleStudent"),
+      topic:          quiz.topic,
+      grade:          quiz.grade,
+      questions:      quiz.questions,
+      includeAnswers,
+      lang,
+    });
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-aula-bg">
       <Header />
@@ -309,12 +322,30 @@ export default function TeacherPage() {
         {quiz && (
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">{quiz.topic} — {quiz.grade}</CardTitle>
-                <Button variant="outline" size="sm" onClick={exportMd} className="gap-1.5 text-xs">
-                  <Download className="w-3.5 h-3.5" />
-                  {t("teacher.export")}
-                </Button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={exportMd} className="gap-1.5 text-xs">
+                    <Download className="w-3.5 h-3.5" />
+                    {t("teacher.export")}
+                  </Button>
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={() => exportPdf(false)}
+                    className="gap-1.5 text-xs text-aula-blue border-aula-blue/30 hover:bg-blue-50"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {t("teacher.pdf.student")}
+                  </Button>
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={() => exportPdf(true)}
+                    className="gap-1.5 text-xs text-aula-green border-aula-green/30 hover:bg-green-50"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {t("teacher.pdf.teacher")}
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
