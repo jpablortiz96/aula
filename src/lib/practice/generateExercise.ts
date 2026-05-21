@@ -15,8 +15,8 @@ function buildPreviousBlock(previousQuestions: string[], lang: "es" | "en"): str
   if (previousQuestions.length === 0) return "";
   const numbered = previousQuestions.map((q, i) => `  ${i + 1}. ${q}`).join("\n");
   return lang === "es"
-    ? `\nYa generaste estas preguntas en esta sesión (NO repitas ninguna):\n${numbered}\nGenera una pregunta COMPLETAMENTE DIFERENTE, con otro enfoque, números distintos o sub-tema relacionado.\n`
-    : `\nYou already generated these questions this session (do NOT repeat any):\n${numbered}\nGenerate a COMPLETELY DIFFERENT question with another angle, different numbers, or related sub-topic.\n`;
+    ? `\nIMPORTANTE: Ya usaste estos planteamientos — NO los repitas ni parafrasees:\n${numbered}\nCrea una pregunta COMPLETAMENTE DIFERENTE: cambia el sub-tema, varía los números, usa otro tipo de ejercicio (resolver / comparar / definir / aplicar / analizar). El enunciado debe ser notablemente distinto a los anteriores.\n`
+    : `\nIMPORTANT: You already used these prompts — do NOT repeat or paraphrase them:\n${numbered}\nCreate a COMPLETELY DIFFERENT question: change the sub-topic, vary the numbers, use a different exercise type (solve / compare / define / apply / analyze). The wording must be clearly distinct from all previous ones.\n`;
 }
 
 function buildExercisePrompt(
@@ -74,8 +74,8 @@ export async function generateExercise(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const prompt = buildExercisePrompt(topic, diffLabel, lang, attempt > 0, previousQuestions);
-    // First attempt: higher temperature for diversity; retry: low temperature for strict JSON
-    const temperature = attempt === 0 ? 0.7 : 0.3;
+    // First attempt: high temperature for diversity; retry: low temperature for strict JSON
+    const temperature = attempt === 0 ? 0.85 : 0.3;
 
     let raw: string;
     try {

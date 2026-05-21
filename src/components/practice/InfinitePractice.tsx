@@ -54,6 +54,15 @@ export function InfinitePractice() {
   // Anti-repetition: tracks last 5 questions generated in this session
   const [previousQuestions,  setPreviousQuestions]  = useState<string[]>([]);
 
+  // Reset history whenever the user changes the topic text (before restarting)
+  const prevTopicRef = useRef(topic);
+  if (prevTopicRef.current !== topic) {
+    prevTopicRef.current = topic;
+    if (phase === "setup" && previousQuestions.length > 0) {
+      setPreviousQuestions([]);
+    }
+  }
+
   // B3: error detector
   const [errorAnalysis,      setErrorAnalysis]      = useState<string | null>(null);
   const [analyzingError,     setAnalyzingError]     = useState(false);
@@ -91,8 +100,17 @@ export function InfinitePractice() {
     setErrorAnalysis(null);
     setShowErrorDetector(false);
 
+    const timeoutMsg = lang === "es"
+      ? "La generación tardó demasiado. Intenta de nuevo."
+      : "Generation timed out. Please try again.";
+
     try {
-      const ex = await generateExercise(currentTopic, currentDifficulty, lang, prevQuestions);
+      const ex = await Promise.race([
+        generateExercise(currentTopic, currentDifficulty, lang, prevQuestions),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(timeoutMsg)), 30_000)
+        ),
+      ]);
       setExercise(ex);
       // Append to history, keep last 5 to avoid inflating the prompt
       setPreviousQuestions((prev) => {
