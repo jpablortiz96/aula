@@ -230,10 +230,10 @@ html.aula-text-large  { font-size: 112.5%; line-height: 1.75; }
 html.aula-text-xl     { font-size: 125%;   line-height: 1.85; letter-spacing: 0.01em; }
 
 /* ── Accessibility: high contrast (dark mode) ────── */
-/* CSS variable overrides — work when utilities reference var(--color-*) */
+/* CSS variable overrides */
 html.aula-high-contrast {
   --color-aula-bg:        #0a0a0a;
-  --color-aula-surface:   #111111;
+  --color-aula-surface:   #1a1a1a;
   --color-aula-ink:       #FFFFFF;
   --color-aula-ink-soft:  #CCCCCC;
   --color-aula-border:    #555555;
@@ -241,26 +241,54 @@ html.aula-high-contrast {
   --aula-ink:             #FFFFFF;
   --aula-ink-soft:        #CCCCCC;
 }
-/* Explicit !important overrides for Tailwind utility classes that may inline values */
+/* Base: force dark bg + white text on body and root */
+html.aula-high-contrast,
 html.aula-high-contrast body {
   background-color: #0a0a0a !important;
   color: #FFFFFF !important;
 }
+/* Force ALL text elements to white — covers shadcn/Tailwind gray scale */
+html.aula-high-contrast h1,
+html.aula-high-contrast h2,
+html.aula-high-contrast h3,
+html.aula-high-contrast h4,
+html.aula-high-contrast h5,
+html.aula-high-contrast h6,
+html.aula-high-contrast p,
+html.aula-high-contrast span,
+html.aula-high-contrast label,
+html.aula-high-contrast div {
+  color: #FFFFFF !important;
+}
+/* Utility-class overrides for gray/slate/zinc text variants */
+html.aula-high-contrast .text-gray-900,
+html.aula-high-contrast .text-gray-800,
+html.aula-high-contrast .text-gray-700,
+html.aula-high-contrast .text-gray-600,
+html.aula-high-contrast .text-slate-900,
+html.aula-high-contrast .text-slate-800,
+html.aula-high-contrast .text-slate-700,
+html.aula-high-contrast .text-zinc-900,
+html.aula-high-contrast .text-neutral-900,
+html.aula-high-contrast .text-black,
+html.aula-high-contrast .text-aula-ink      { color: #FFFFFF !important; }
+html.aula-high-contrast .text-gray-500,
+html.aula-high-contrast .text-gray-400,
+html.aula-high-contrast .text-slate-500,
+html.aula-high-contrast .text-aula-ink-soft,
+html.aula-high-contrast .text-muted-foreground { color: #CCCCCC !important; }
+/* Background overrides */
 html.aula-high-contrast .bg-white,
 html.aula-high-contrast .bg-aula-bg,
-html.aula-high-contrast .bg-aula-surface {
-  background-color: #111111 !important;
-}
-html.aula-high-contrast .bg-gray-50  { background-color: #1a1a1a !important; }
-html.aula-high-contrast .bg-gray-100 { background-color: #1f1f1f !important; }
-html.aula-high-contrast .text-aula-ink      { color: #FFFFFF !important; }
-html.aula-high-contrast .text-aula-ink-soft,
-html.aula-high-contrast .text-gray-500,
-html.aula-high-contrast .text-muted-foreground { color: #CCCCCC !important; }
+html.aula-high-contrast .bg-aula-surface,
+html.aula-high-contrast .bg-slate-50        { background-color: #1a1a1a !important; }
+html.aula-high-contrast .bg-gray-50         { background-color: #1a1a1a !important; }
+html.aula-high-contrast .bg-gray-100        { background-color: #242424 !important; }
+/* Border overrides */
 html.aula-high-contrast .border-aula-border,
 html.aula-high-contrast .border-gray-100,
-html.aula-high-contrast .border-gray-200 { border-color: #444444 !important; }
-html.aula-high-contrast .shadow-sm { box-shadow: 0 1px 3px rgba(255,255,255,0.08); }
+html.aula-high-contrast .border-gray-200    { border-color: #555555 !important; }
+html.aula-high-contrast .shadow-sm { box-shadow: 0 1px 3px rgba(255,255,255,0.06); }
 
 /* ── Accessibility: reduce motion ───────────────── */
 html.aula-reduce-motion *,
