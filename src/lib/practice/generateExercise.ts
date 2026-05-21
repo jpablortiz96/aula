@@ -1,5 +1,4 @@
 import { extractJson } from "@/lib/jsonExtract";
-import { generateText } from "@/engines/engineSingleton";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -11,52 +10,49 @@ export interface Exercise {
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
 
-function buildPreviousBlock(previousQuestions: string[], lang: "es" | "en"): string {
-  if (previousQuestions.length === 0) return "";
-  const numbered = previousQuestions.map((q, i) => `  ${i + 1}. ${q}`).join("\n");
+function buildSystemPrompt(lang: "es" | "en"): string {
   return lang === "es"
-    ? `\nIMPORTANTE: Ya usaste estos planteamientos — NO los repitas ni parafrasees:\n${numbered}\nCrea una pregunta COMPLETAMENTE DIFERENTE: cambia el sub-tema, varía los números, usa otro tipo de ejercicio (resolver / comparar / definir / aplicar / analizar). El enunciado debe ser notablemente distinto a los anteriores.\n`
-    : `\nIMPORTANT: You already used these prompts — do NOT repeat or paraphrase them:\n${numbered}\nCreate a COMPLETELY DIFFERENT question: change the sub-topic, vary the numbers, use a different exercise type (solve / compare / define / apply / analyze). The wording must be clearly distinct from all previous ones.\n`;
+    ? `Eres un generador de ejercicios educativos. Cada vez que te pidan un ejercicio, generas UNO nuevo y completamente distinto al anterior. Varías: números, contexto, sub-tema, tipo de razonamiento (resolver / comparar / definir / aplicar / analizar).
+
+Respondes ÚNICAMENTE con un objeto JSON válido, sin texto alrededor, sin markdown, sin bloques de código:
+{"question":"...","answer":"...","explanation":"..."}`
+    : `You are an educational exercise generator. Every time you are asked for an exercise, you generate ONE new one that is completely different from the previous. You vary: numbers, context, sub-topic, type of reasoning (solve / compare / define / apply / analyze).
+
+Reply ONLY with a valid JSON object, no surrounding text, no markdown, no code blocks:
+{"question":"...","answer":"...","explanation":"..."}`;
 }
 
-function buildExercisePrompt(
+function buildUserPrompt(
   topic: string,
   diffLabel: string,
   lang: "es" | "en",
-  isRetry: boolean,
   previousQuestions: string[],
+  isRetry: boolean,
 ): string {
-  const prevBlock = buildPreviousBlock(previousQuestions, lang);
+  const prevBlock =
+    previousQuestions.length > 0
+      ? lang === "es"
+        ? `\nYa generaste estas preguntas. NO las repitas ni hagas variaciones triviales (cambiar solo un número):\n${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
+        : `\nYou already generated these questions. Do NOT repeat them or make trivial variations (changing only one number):\n${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n`
+      : "";
 
-  if (isRetry) {
-    return lang === "es"
-      ? `Tu respuesta anterior no fue JSON válido. Intenta de nuevo.
-RESPONDE ÚNICAMENTE con un objeto JSON. Nada antes. Nada después. Sin markdown.
+  const base =
+    lang === "es"
+      ? `${prevBlock}Genera un ejercicio de nivel ${diffLabel} sobre: "${topic}"`
+      : `${prevBlock}Generate a ${diffLabel} exercise about: "${topic}"`;
 
-{"question":"[pregunta de nivel ${diffLabel} sobre ${topic}]","answer":"[respuesta correcta]","explanation":"[explicación breve]"}`
-      : `Your previous response was not valid JSON. Try again.
-REPLY ONLY with a JSON object. Nothing before. Nothing after. No markdown.
-
-{"question":"[${diffLabel} question about ${topic}]","answer":"[correct answer]","explanation":"[brief explanation]"}`;
-  }
+  if (!isRetry) return base;
 
   return lang === "es"
-    ? `Eres un generador de ejercicios educativos. Tu única tarea es producir UN objeto JSON válido.
+    ? `${base}\n\nIMPORTANTE: Responde ÚNICAMENTE con el JSON. Sin texto antes ni después. Sin bloques de código.`
+    : `${base}\n\nIMPORTANT: Reply ONLY with the JSON. No text before or after. No code blocks.`;
+}
 
-REGLAS ABSOLUTAS:
-- Responde ÚNICAMENTE con el JSON. Nada antes ni después. Sin texto extra. Sin markdown.
-- Estructura exacta: {"question":"...","answer":"...","explanation":"..."}
-- No uses bloques de código. No pongas comentarios. No expliques nada fuera del JSON.
-${prevBlock}
-Tema: "${topic}". Nivel: ${diffLabel}.`
-    : `You are an educational exercise generator. Your only job is to produce ONE valid JSON object.
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-ABSOLUTE RULES:
-- Reply ONLY with the JSON. Nothing before or after. No extra text. No markdown.
-- Exact structure: {"question":"...","answer":"...","explanation":"..."}
-- No code blocks. No comments. No explanations outside the JSON.
-${prevBlock}
-Topic: "${topic}". Level: ${diffLabel}.`;
+async function getCloudEngine() {
+  const { CloudBoostEngine } = await import("@/engines/cloud-boost/CloudBoostEngine");
+  return new CloudBoostEngine();
 }
 
 // ── Main functions ────────────────────────────────────────────────────────────
@@ -67,21 +63,28 @@ export async function generateExercise(
   lang: "es" | "en",
   previousQuestions: string[] = [],
 ): Promise<Exercise> {
+  const cloud = await getCloudEngine();
+
   const diffLabel =
     lang === "es"
       ? { easy: "fácil", medium: "medio", hard: "difícil" }[difficulty]
       : difficulty;
 
+  const systemContent = buildSystemPrompt(lang);
+
   for (let attempt = 0; attempt < 2; attempt++) {
-    const prompt = buildExercisePrompt(topic, diffLabel, lang, attempt > 0, previousQuestions);
-    // First attempt: high temperature for diversity; retry: low temperature for strict JSON
-    const temperature = attempt === 0 ? 0.85 : 0.3;
+    const userContent = buildUserPrompt(topic, diffLabel, lang, previousQuestions, attempt > 0);
 
     let raw: string;
     try {
-      raw = await generateText(prompt, { maxTokens: 300, temperature });
+      raw = await cloud.generate(
+        [
+          { role: "system", content: systemContent },
+          { role: "user",   content: userContent },
+        ],
+        { maxTokens: 400, temperature: attempt === 0 ? 0.8 : 0.2 },
+      );
     } catch (err) {
-      // Engine errors (no engine loaded, network, etc.) — not retried, bubble up
       throw err;
     }
 
@@ -97,11 +100,10 @@ export async function generateExercise(
         };
       }
     } catch {
-      // JSON extraction failed — retry once with stricter prompt
+      // JSON extraction failed — retry with stricter prompt
     }
   }
 
-  // Both attempts failed — throw a user-friendly message
   throw new Error(
     lang === "es"
       ? "No pude generar el ejercicio. Intenta con otro tema."
@@ -115,6 +117,8 @@ export async function analyzeConceptualError(
   studentAnswer: string,
   lang: "es" | "en",
 ): Promise<string> {
+  const cloud = await getCloudEngine();
+
   const prompt =
     lang === "es"
       ? `Un estudiante respondió incorrectamente a este ejercicio.
@@ -132,7 +136,10 @@ Student's answer: ${studentAnswer}
 
 Identify the conceptual error in the student's answer in 2-3 sentences. Be kind and constructive. Don't give the answer directly; help them understand what went wrong.`;
 
-  const text = await generateText(prompt, { maxTokens: 200, temperature: 0.3 });
+  const text = await cloud.generate(
+    [{ role: "user", content: prompt }],
+    { maxTokens: 200, temperature: 0.3 },
+  );
   return text || (lang === "es" ? "No se pudo analizar el error." : "Could not analyze the error.");
 }
 

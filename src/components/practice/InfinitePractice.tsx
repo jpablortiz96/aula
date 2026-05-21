@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useT } from "@/hooks/useT";
 import { useI18nStore } from "@/store/i18nStore";
 import { useProgressStore } from "@/store/progressStore";
@@ -180,15 +181,23 @@ export function InfinitePractice() {
     void fetchExercise(topic.trim(), difficulty, previousQuestions);
   }, [topic, difficulty, fetchExercise, previousQuestions]);
 
-  const canGenerate =
+  const hasCloudKey =
     typeof window !== "undefined" &&
-    (getActiveEngine() !== null ||
-      Boolean(localStorage.getItem("aula:google-ai-api-key")));
+    Boolean(localStorage.getItem("aula:google-ai-api-key"));
 
-  if (!canGenerate) {
+  if (!hasCloudKey) {
     return (
-      <div className="rounded-3xl bg-aula-surface border border-aula-border p-6 text-center">
-        <p className="text-sm text-aula-ink">{t("practice.noApiKey")}</p>
+      <div className="rounded-3xl bg-aula-surface border border-aula-border p-6 flex flex-col items-center gap-4 text-center">
+        <span className="text-3xl" aria-hidden="true">📚</span>
+        <p className="text-sm text-aula-ink leading-relaxed max-w-xs">
+          {t("practice.cloudRequired")}
+        </p>
+        <Link
+          href="/settings"
+          className="rounded-2xl bg-aula-blue text-white text-sm font-semibold px-5 py-2.5 hover:bg-aula-blue/90 transition-all"
+        >
+          {t("practice.goToSettings")}
+        </Link>
       </div>
     );
   }
@@ -197,6 +206,11 @@ export function InfinitePractice() {
   if (phase === "setup") {
     return (
       <div className="flex flex-col gap-4">
+        <div className="flex justify-end">
+          <span className="text-[10px] text-aula-ink-soft bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5">
+            {t("practice.cloudBadge")}
+          </span>
+        </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-aula-ink" htmlFor="practice-topic">
             {t("practice.topic")}
@@ -252,16 +266,19 @@ export function InfinitePractice() {
   // ── Question / Result ─────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4">
-      {/* Header row: exercise #, streak, difficulty */}
+      {/* Header row: exercise #, streak, difficulty, cloud badge */}
       <div className="flex items-center justify-between text-xs text-aula-ink-soft">
         <span>{t("practice.session").replace("{n}", String(exerciseNumber + 1))}</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {sessionStreak > 1 && (
             <span className="text-aula-yellow font-semibold">
               {t("practice.streak").replace("{n}", String(sessionStreak))} 🔥
             </span>
           )}
           <DifficultyBadge difficulty={difficulty} t={t} />
+          <span className="bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5">
+            {t("practice.cloudBadge")}
+          </span>
         </div>
       </div>
 

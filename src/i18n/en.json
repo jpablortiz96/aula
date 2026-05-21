@@ -216,12 +216,15 @@
   "practice.difficulty.hard": "Hard",
   "practice.generating": "Generating exercise…",
   "practice.noApiKey": "Infinite Practice requires Cloud Boost. Add your API key in Settings.",
+  "practice.cloudRequired": "📚 Infinite Practice needs Cloud Boost to generate high-quality varied exercises. Add your free Google AI Studio API key in Settings.",
+  "practice.goToSettings": "Go to Settings →",
+  "practice.cloudBadge": "☁️ Cloud (Gemma 4 26B)",
   "practice.session": "Exercise {n}",
 
   "illustrator.button": "🎨 Illustrate it",
   "illustrator.generating": "Generating illustration…",
   "illustrator.error": "Could not generate illustration.",
-  "illustrator.badge": "AI-generated illustration",
+  "illustrator.badge": "☁️ Illustrated with Cloud Boost",
   "illustrator.goToSettings": "→ Go to Settings",
 
   "errorDetector.title": "💡 Let's clarify this",
