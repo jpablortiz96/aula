@@ -240,6 +240,14 @@ html.aula-high-contrast {
   --aula-bg:              #0a0a0a;
   --aula-ink:             #FFFFFF;
   --aula-ink-soft:        #CCCCCC;
+  --background:           #0a0a0a;
+  --foreground:           #FFFFFF;
+  --card:                 #1a1a1a;
+  --card-foreground:      #FFFFFF;
+  --muted:                #242424;
+  --muted-foreground:     #CCCCCC;
+  --border:               #555555;
+  --input:                #2a2a2a;
 }
 /* Base: force dark bg + white text on body and root */
 html.aula-high-contrast,
@@ -247,48 +255,70 @@ html.aula-high-contrast body {
   background-color: #0a0a0a !important;
   color: #FFFFFF !important;
 }
-/* Force ALL text elements to white — covers shadcn/Tailwind gray scale */
-html.aula-high-contrast h1,
-html.aula-high-contrast h2,
-html.aula-high-contrast h3,
-html.aula-high-contrast h4,
-html.aula-high-contrast h5,
-html.aula-high-contrast h6,
-html.aula-high-contrast p,
-html.aula-high-contrast span,
-html.aula-high-contrast label,
-html.aula-high-contrast div {
-  color: #FFFFFF !important;
+/* Nuclear option: all elements default to white text, with exceptions below */
+html.aula-high-contrast * {
+  color: #FFFFFF;
+  border-color: #444444;
 }
-/* Utility-class overrides for gray/slate/zinc text variants */
-html.aula-high-contrast .text-gray-900,
-html.aula-high-contrast .text-gray-800,
-html.aula-high-contrast .text-gray-700,
-html.aula-high-contrast .text-gray-600,
-html.aula-high-contrast .text-slate-900,
-html.aula-high-contrast .text-slate-800,
-html.aula-high-contrast .text-slate-700,
-html.aula-high-contrast .text-zinc-900,
-html.aula-high-contrast .text-neutral-900,
-html.aula-high-contrast .text-black,
-html.aula-high-contrast .text-aula-ink      { color: #FFFFFF !important; }
+/* Preserve action/brand colors — must come after the nuclear rule */
+html.aula-high-contrast .text-aula-blue,
+html.aula-high-contrast .text-blue-600,
+html.aula-high-contrast .text-blue-500  { color: #60A5FA !important; }
+html.aula-high-contrast .text-aula-green,
+html.aula-high-contrast .text-green-600 { color: #4ADE80 !important; }
+html.aula-high-contrast .text-aula-red,
+html.aula-high-contrast .text-red-600   { color: #F87171 !important; }
+html.aula-high-contrast .text-aula-yellow,
+html.aula-high-contrast .text-yellow-600 { color: #FBBF24 !important; }
+html.aula-high-contrast .text-amber-700  { color: #FCD34D !important; }
+html.aula-high-contrast .text-purple-700 { color: #C084FC !important; }
+/* Soft text stays readable but dimmer */
+html.aula-high-contrast .text-aula-ink-soft,
 html.aula-high-contrast .text-gray-500,
 html.aula-high-contrast .text-gray-400,
-html.aula-high-contrast .text-slate-500,
-html.aula-high-contrast .text-aula-ink-soft,
 html.aula-high-contrast .text-muted-foreground { color: #CCCCCC !important; }
-/* Background overrides */
+/* Buttons with colored backgrounds need white text */
+html.aula-high-contrast .bg-aula-blue,
+html.aula-high-contrast .bg-aula-green,
+html.aula-high-contrast .bg-aula-red   { color: #FFFFFF !important; }
+/* Background overrides — neutral surfaces */
 html.aula-high-contrast .bg-white,
 html.aula-high-contrast .bg-aula-bg,
 html.aula-high-contrast .bg-aula-surface,
-html.aula-high-contrast .bg-slate-50        { background-color: #1a1a1a !important; }
-html.aula-high-contrast .bg-gray-50         { background-color: #1a1a1a !important; }
-html.aula-high-contrast .bg-gray-100        { background-color: #242424 !important; }
+html.aula-high-contrast .bg-slate-50   { background-color: #1a1a1a !important; }
+html.aula-high-contrast .bg-gray-50    { background-color: #1a1a1a !important; }
+html.aula-high-contrast .bg-gray-100   { background-color: #242424 !important; }
+html.aula-high-contrast .bg-gray-200   { background-color: #2e2e2e !important; }
+html.aula-high-contrast .bg-gray-950   { background-color: #000000 !important; }
+/* Tinted "light" backgrounds used by calc buttons and cards */
+html.aula-high-contrast .bg-blue-50    { background-color: #1a2540 !important; }
+html.aula-high-contrast .bg-amber-50   { background-color: #2a1f00 !important; }
+html.aula-high-contrast .bg-purple-50  { background-color: #1e1040 !important; }
+html.aula-high-contrast .bg-red-50     { background-color: #2a0a0a !important; }
+html.aula-high-contrast .bg-green-50   { background-color: #0a2a10 !important; }
+/* Tinted result/feedback cards */
+html.aula-high-contrast [class*="bg-aula-green/"],
+html.aula-high-contrast [class*="bg-aula-red/"],
+html.aula-high-contrast [class*="bg-aula-yellow/"],
+html.aula-high-contrast [class*="bg-aula-blue/"] { background-color: #1a1a1a !important; }
+/* Inputs, textareas, selects */
+html.aula-high-contrast input,
+html.aula-high-contrast textarea,
+html.aula-high-contrast select {
+  background-color: #1a1a1a !important;
+  color: #FFFFFF !important;
+  border-color: #888888 !important;
+}
+html.aula-high-contrast input::placeholder,
+html.aula-high-contrast textarea::placeholder { color: #888888 !important; }
 /* Border overrides */
-html.aula-high-contrast .border-aula-border,
 html.aula-high-contrast .border-gray-100,
-html.aula-high-contrast .border-gray-200    { border-color: #555555 !important; }
-html.aula-high-contrast .shadow-sm { box-shadow: 0 1px 3px rgba(255,255,255,0.06); }
+html.aula-high-contrast .border-gray-200,
+html.aula-high-contrast .border-aula-border { border-color: #555555 !important; }
+/* Kill decorative shadows — replace with subtle border */
+html.aula-high-contrast .shadow-sm,
+html.aula-high-contrast .shadow-md,
+html.aula-high-contrast .shadow-lg { box-shadow: none !important; }
 
 /* ── Accessibility: reduce motion ───────────────── */
 html.aula-reduce-motion *,
