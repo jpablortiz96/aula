@@ -2,10 +2,30 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { generateText, getActiveEngine } from "@/engines/engineSingleton";
 import { useProgressStore } from "@/store/progressStore";
 import { useT } from "@/hooks/useT";
 import { useI18nStore } from "@/store/i18nStore";
+
+const REMARK_PLUGINS = [remarkGfm, remarkMath] as Parameters<typeof ReactMarkdown>[0]["remarkPlugins"];
+const REHYPE_PLUGINS = [rehypeKatex] as Parameters<typeof ReactMarkdown>[0]["rehypePlugins"];
+
+const MD: React.ComponentProps<typeof ReactMarkdown>["components"] = {
+  p:      ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-aula-green">{children}</strong>,
+  ol:     ({ children }) => <ol className="pl-5 list-decimal space-y-1.5 my-2">{children}</ol>,
+  ul:     ({ children }) => <ul className="pl-5 list-disc space-y-1.5 my-2">{children}</ul>,
+  li:     ({ children }) => <li className="leading-relaxed">{children}</li>,
+  code:   ({ children }) => (
+    <code className="bg-aula-green/10 text-aula-green px-1.5 py-0.5 rounded text-sm font-mono">
+      {children}
+    </code>
+  ),
+};
 
 // ─── Button definitions ───────────────────────────────────────────────────────
 
@@ -242,8 +262,14 @@ export function ScientificCalculator() {
           <p className="text-xs font-semibold text-aula-green uppercase tracking-wide">
             {t("calculator.result.label")}
           </p>
-          <div className="text-sm text-aula-ink leading-relaxed whitespace-pre-wrap font-mono">
-            {result}
+          <div className="text-sm text-aula-ink">
+            <ReactMarkdown
+              remarkPlugins={REMARK_PLUGINS}
+              rehypePlugins={REHYPE_PLUGINS}
+              components={MD}
+            >
+              {result}
+            </ReactMarkdown>
           </div>
           <button
             onClick={reset}
