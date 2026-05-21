@@ -222,6 +222,7 @@
   "illustrator.generating": "Generating illustration…",
   "illustrator.error": "Could not generate illustration.",
   "illustrator.badge": "AI-generated illustration",
+  "illustrator.goToSettings": "→ Go to Settings",
 
   "errorDetector.title": "💡 Let's clarify this",
   "errorDetector.desc": "AULA detected a possible conceptual error. Want to go deeper?",

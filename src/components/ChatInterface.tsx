@@ -144,7 +144,14 @@ function AssistantBubble({
         </div>
       )}
       {illustrateError && (
-        <p className="text-[10px] text-aula-red mt-1 ml-1">{t("illustrator.error")}</p>
+        <div className="mt-1 ml-1">
+          <p className="text-[10px] text-aula-red leading-relaxed">{illustrateError}</p>
+          {(illustrateError.includes("Settings") || illustrateError.includes("Configuración")) && (
+            <Link href="/settings" className="text-[10px] text-aula-blue underline">
+              {t("illustrator.goToSettings")}
+            </Link>
+          )}
+        </div>
       )}
 
       {!streaming && (
@@ -560,10 +567,10 @@ export function ChatInterface({
                     simplifyLevel={simplifyLevels[msg.id] ?? 0}
                     onSpeak={ttsSupported ? () => speak(msg.content) : undefined}
                     onSimplify={isReady ? (lvl) => handleSimplify(msg.id, msg.content, lvl) : undefined}
-                    onIllustrate={isReady ? async () => {
+                    onIllustrate={async () => {
                       recordIllustrator();
                       return generateIllustration(msg.content, lang);
-                    } : undefined}
+                    }}
                   />
                 )}
               </div>
