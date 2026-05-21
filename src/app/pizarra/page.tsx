@@ -13,12 +13,6 @@ import { useRouter } from "next/navigation";
 
 type Tab = "calculator" | "handwriting";
 
-const API_KEY_KEY = "aula:google-ai-api-key";
-
-function hasApiKey(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean(localStorage.getItem(API_KEY_KEY));
-}
 
 export default function PizarraPage() {
   const router = useRouter();
@@ -104,31 +98,12 @@ export default function PizarraPage() {
                 </span>
               </div>
 
-              {!hasApiKey() ? (
-                <div className="rounded-3xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col items-center gap-3 text-center">
-                  <p className="text-sm text-aula-ink">{t("pizarra.pro.noKey")}</p>
-                  <Link
-                    href="/settings"
-                    className="text-sm font-semibold text-aula-blue hover:underline"
-                  >
-                    {t("pizarra.pro.noKeyLink")}
-                  </Link>
-                  <p className="text-xs text-aula-ink-soft mt-1">{t("pizarra.pro.useKeyboard")}</p>
-                  <button
-                    onClick={() => setTab("calculator")}
-                    className="mt-2 rounded-xl bg-aula-blue text-white text-sm font-semibold px-4 py-2 hover:bg-aula-blue/90 active:scale-95 transition-all"
-                  >
-                    {t("pizarra.tab.calculator")}
-                  </button>
-                </div>
-              ) : (
-                <div className="min-h-[500px]">
-                  <DigitalWhiteboard
-                    onSolve={handleWhiteboardSolve}
-                    onCloudBoost={handleCloudBoost}
-                  />
-                </div>
-              )}
+              <div className="min-h-[500px]">
+                <DigitalWhiteboard
+                  onSolve={handleWhiteboardSolve}
+                  onCloudBoost={handleCloudBoost}
+                />
+              </div>
             </>
           )}
         </div>
