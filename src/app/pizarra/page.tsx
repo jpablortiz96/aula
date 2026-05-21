@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Keyboard, PenLine } from "lucide-react";
+import { Calculator, PenLine } from "lucide-react";
 import { Header } from "@/components/Header";
 import { AchievementToast } from "@/components/AchievementToast";
 import { DigitalWhiteboard } from "@/components/pizarra/DigitalWhiteboard";
-import { EquationBuilder } from "@/components/pizarra/EquationBuilder";
+import { ScientificCalculator } from "@/components/pizarra/ScientificCalculator";
 import { useProgressStore } from "@/store/progressStore";
 import { useT } from "@/hooks/useT";
+import { useRouter } from "next/navigation";
 
-type Tab = "keyboard" | "handwriting";
+type Tab = "calculator" | "handwriting";
 
 const API_KEY_KEY = "aula:google-ai-api-key";
 
@@ -23,17 +23,9 @@ function hasApiKey(): boolean {
 export default function PizarraPage() {
   const router = useRouter();
   const t      = useT();
-  const [tab, setTab] = useState<Tab>("keyboard");
+  const [tab, setTab] = useState<Tab>("calculator");
 
-  const recordWhiteboard      = useProgressStore((s) => s.recordWhiteboardUsed);
-  const recordEquationBuilder = useProgressStore((s) => s.recordEquationBuilderUsed);
-
-  function handleEquationSolve(latex: string, readable: string) {
-    recordEquationBuilder();
-    const prompt  = `Resuelve: $${latex}$ (es decir: ${readable})`;
-    const encoded = encodeURIComponent(prompt);
-    router.push(`/chat?wb=${encoded}`);
-  }
+  const recordWhiteboard = useProgressStore((s) => s.recordWhiteboardUsed);
 
   function handleWhiteboardSolve(text: string) {
     recordWhiteboard();
@@ -73,12 +65,12 @@ export default function PizarraPage() {
           aria-label={t("pizarra.title")}
         >
           <TabBtn
-            active={tab === "keyboard"}
-            onClick={() => setTab("keyboard")}
-            aria-selected={tab === "keyboard"}
+            active={tab === "calculator"}
+            onClick={() => setTab("calculator")}
+            aria-selected={tab === "calculator"}
           >
-            <Keyboard className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{t("pizarra.tab.keyboard")}</span>
+            <Calculator className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{t("pizarra.tab.calculator")}</span>
           </TabBtn>
 
           <TabBtn
@@ -88,18 +80,18 @@ export default function PizarraPage() {
           >
             <PenLine className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>{t("pizarra.tab.handwriting")}</span>
-            <span className="ml-1 text-[10px] font-bold rounded-full bg-aula-yellow px-1.5 py-0.5 text-white shrink-0">
-              PRO
+            <span className="ml-1 text-[9px] font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+              🌐 {t("pizarra.tab.internet")}
             </span>
           </TabBtn>
         </div>
 
         {/* Panel */}
         <div className="flex-1">
-          {tab === "keyboard" && (
+          {tab === "calculator" && (
             <div className="rounded-3xl bg-white border border-gray-200 shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-aula-ink mb-4">{t("equationBuilder.title")}</h2>
-              <EquationBuilder onSolve={handleEquationSolve} />
+              <h2 className="text-sm font-semibold text-aula-ink mb-4">{t("calculator.title")}</h2>
+              <ScientificCalculator />
             </div>
           )}
 
@@ -123,10 +115,10 @@ export default function PizarraPage() {
                   </Link>
                   <p className="text-xs text-aula-ink-soft mt-1">{t("pizarra.pro.useKeyboard")}</p>
                   <button
-                    onClick={() => setTab("keyboard")}
+                    onClick={() => setTab("calculator")}
                     className="mt-2 rounded-xl bg-aula-blue text-white text-sm font-semibold px-4 py-2 hover:bg-aula-blue/90 active:scale-95 transition-all"
                   >
-                    {t("pizarra.tab.keyboard")}
+                    {t("pizarra.tab.calculator")}
                   </button>
                 </div>
               ) : (

@@ -166,12 +166,21 @@
   "pizarra.nativeApi": "Native recognition (Chrome)",
   "pizarra.gemini": "Transcribed with Gemini ✓",
 
-  "pizarra.tab.keyboard": "Keyboard",
-  "pizarra.tab.handwriting": "Handwriting (Pro)",
+  "pizarra.tab.calculator": "Calculator",
+  "pizarra.tab.handwriting": "Handwriting",
+  "pizarra.tab.internet": "Internet",
   "pizarra.pro.badge": "✨ Pro Mode — requires internet",
   "pizarra.pro.noKey": "Pro mode requires a Google AI Studio API key.",
   "pizarra.pro.noKeyLink": "Set up in Settings →",
   "pizarra.pro.useKeyboard": "Use the math keyboard for free, offline.",
+
+  "calculator.title": "Scientific Calculator",
+  "calculator.displayPlaceholder": "Enter an expression…",
+  "calculator.solving": "Calculating…",
+  "calculator.result.label": "Result",
+  "calculator.newCalc": "New calculation",
+  "calculator.badge": "Solved 100% locally",
+  "calculator.noEngine": "Load the model from Chat first, or add an API key in Settings.",
 
   "equationBuilder.title": "Math Keyboard",
   "equationBuilder.preview": "Preview",
