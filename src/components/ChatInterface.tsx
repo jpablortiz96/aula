@@ -11,12 +11,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { Mic, MicOff, Headphones, Volume2, Send, Square, Pencil, Check, Loader2, X, Palette } from "lucide-react";
+import { Mic, MicOff, Headphones, Volume2, Send, Square, PenLine, Check, Loader2, X, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageInput } from "@/components/ImageInput";
-import { DigitalWhiteboard } from "@/components/pizarra/DigitalWhiteboard";
+import Link from "next/link";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useT } from "@/hooks/useT";
@@ -334,8 +334,6 @@ export function ChatInterface({
   const [input,      setInput]     = useState("");
   const [images,     setImages]    = useState<string[]>([]);
   const [handsFree,  setHandsFree] = useState(false);
-  const [wbOpen,     setWbOpen]    = useState(false);
-
   // Per-bubble simplify level map: messageId → level (0=original)
   const [simplifyLevels, setSimplifyLevels] = useState<Record<string, number>>({});
 
@@ -357,7 +355,6 @@ export function ChatInterface({
   const addQuestion         = useProgressStore((s) => s.addQuestion);
   const recordCameraUsed    = useProgressStore((s) => s.recordCameraUsed);
   const recordVoiceUsed     = useProgressStore((s) => s.recordVoiceUsed);
-  const recordWbUsed        = useProgressStore((s) => s.recordWhiteboardUsed);
   const checkSimplify       = useProgressStore((s) => s.checkSimplifyCount);
   const recordIllustrator   = useProgressStore((s) => s.recordIllustratorUsed);
 
@@ -484,28 +481,6 @@ export function ChatInterface({
     onGenerate(prompt, undefined, { simplified: true, simplifyLevel: level });
   }
 
-  // ── Whiteboard handlers ───────────────────────────────────────────────────────
-
-  function handleWbSolve(text: string) {
-    setWbOpen(false);
-    recordWbUsed();
-    addQuestion();
-    const prompt = lang === "en"
-      ? `The student wrote this problem by hand: ${text}\n\nSolve it step by step in a didactic way.`
-      : `El estudiante escribió este problema a mano: ${text}\n\nResuélvelo paso a paso de forma didáctica.`;
-    onGenerate(prompt, undefined, { fromWhiteboard: true });
-  }
-
-  function handleWbCloudBoost(dataUrl: string) {
-    setWbOpen(false);
-    addQuestion();
-    recordCameraUsed();
-    const prompt = lang === "en"
-      ? "The student wrote this problem on a whiteboard. Please read and solve it step by step."
-      : "El estudiante escribió este problema en la pizarra. Por favor léelo y resuélvelo paso a paso.";
-    onGenerate(prompt, [dataUrl]);
-  }
-
   const showStream   = isGenerating && streamedText;
   const showPending  = isGenerating && pendingUserMsg;
   const showThinking = isGenerating && !streamedText;
@@ -520,19 +495,6 @@ export function ChatInterface({
 
   return (
     <>
-      {/* Whiteboard overlay modal */}
-      {wbOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl h-[70vh] flex flex-col">
-            <DigitalWhiteboard
-              onSolve={handleWbSolve}
-              onCancel={() => setWbOpen(false)}
-              onCloudBoost={handleWbCloudBoost}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col gap-3">
         {/* Tok/s badge */}
         <div className="flex items-center justify-between min-h-[26px]">
@@ -731,18 +693,14 @@ export function ChatInterface({
                   {t("chatInterface.manosLibres")}
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setWbOpen(true)}
-                disabled={!isReady || isGenerating}
-                className="gap-1.5 text-xs rounded-full border-gray-200 text-aula-ink-soft hover:border-aula-blue hover:text-aula-blue"
+              <Link
+                href="/pizarra"
+                className="inline-flex items-center gap-1.5 text-xs rounded-full border border-gray-200 text-aula-ink-soft hover:border-aula-blue hover:text-aula-blue px-3 py-1.5 transition-colors"
                 aria-label={t("chatInterface.pizarra")}
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <PenLine className="w-3.5 h-3.5" />
                 {t("chatInterface.pizarra")}
-              </Button>
+              </Link>
             </div>
           </div>
         )}
