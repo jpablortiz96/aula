@@ -11,14 +11,24 @@ export interface Exercise {
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
 
+function buildPreviousBlock(previousQuestions: string[], lang: "es" | "en"): string {
+  if (previousQuestions.length === 0) return "";
+  const numbered = previousQuestions.map((q, i) => `  ${i + 1}. ${q}`).join("\n");
+  return lang === "es"
+    ? `\nYa generaste estas preguntas en esta sesión (NO repitas ninguna):\n${numbered}\nGenera una pregunta COMPLETAMENTE DIFERENTE, con otro enfoque, números distintos o sub-tema relacionado.\n`
+    : `\nYou already generated these questions this session (do NOT repeat any):\n${numbered}\nGenerate a COMPLETELY DIFFERENT question with another angle, different numbers, or related sub-topic.\n`;
+}
+
 function buildExercisePrompt(
   topic: string,
   diffLabel: string,
   lang: "es" | "en",
   isRetry: boolean,
+  previousQuestions: string[],
 ): string {
+  const prevBlock = buildPreviousBlock(previousQuestions, lang);
+
   if (isRetry) {
-    // Stricter prompt for second attempt
     return lang === "es"
       ? `Tu respuesta anterior no fue JSON válido. Intenta de nuevo.
 RESPONDE ÚNICAMENTE con un objeto JSON. Nada antes. Nada después. Sin markdown.
@@ -37,7 +47,7 @@ REGLAS ABSOLUTAS:
 - Responde ÚNICAMENTE con el JSON. Nada antes ni después. Sin texto extra. Sin markdown.
 - Estructura exacta: {"question":"...","answer":"...","explanation":"..."}
 - No uses bloques de código. No pongas comentarios. No expliques nada fuera del JSON.
-
+${prevBlock}
 Tema: "${topic}". Nivel: ${diffLabel}.`
     : `You are an educational exercise generator. Your only job is to produce ONE valid JSON object.
 
@@ -45,7 +55,7 @@ ABSOLUTE RULES:
 - Reply ONLY with the JSON. Nothing before or after. No extra text. No markdown.
 - Exact structure: {"question":"...","answer":"...","explanation":"..."}
 - No code blocks. No comments. No explanations outside the JSON.
-
+${prevBlock}
 Topic: "${topic}". Level: ${diffLabel}.`;
 }
 
@@ -55,6 +65,7 @@ export async function generateExercise(
   topic: string,
   difficulty: Difficulty,
   lang: "es" | "en",
+  previousQuestions: string[] = [],
 ): Promise<Exercise> {
   const diffLabel =
     lang === "es"
@@ -62,11 +73,13 @@ export async function generateExercise(
       : difficulty;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const prompt = buildExercisePrompt(topic, diffLabel, lang, attempt > 0);
+    const prompt = buildExercisePrompt(topic, diffLabel, lang, attempt > 0, previousQuestions);
+    // First attempt: higher temperature for diversity; retry: low temperature for strict JSON
+    const temperature = attempt === 0 ? 0.7 : 0.3;
 
     let raw: string;
     try {
-      raw = await generateText(prompt, { maxTokens: 300, temperature: 0.35 });
+      raw = await generateText(prompt, { maxTokens: 300, temperature });
     } catch (err) {
       // Engine errors (no engine loaded, network, etc.) — not retried, bubble up
       throw err;

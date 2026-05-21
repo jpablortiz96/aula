@@ -51,6 +51,9 @@ export function InfinitePractice() {
   const [sessionStreak,      setSessionStreak]      = useState(0);
   const [exerciseNumber,     setExerciseNumber]     = useState(0);
 
+  // Anti-repetition: tracks last 5 questions generated in this session
+  const [previousQuestions,  setPreviousQuestions]  = useState<string[]>([]);
+
   // B3: error detector
   const [errorAnalysis,      setErrorAnalysis]      = useState<string | null>(null);
   const [analyzingError,     setAnalyzingError]     = useState(false);
@@ -79,6 +82,7 @@ export function InfinitePractice() {
   const fetchExercise = useCallback(async (
     currentTopic: string,
     currentDifficulty: Difficulty,
+    prevQuestions: string[],
   ) => {
     setPhase("loading");
     setError(null);
@@ -88,13 +92,17 @@ export function InfinitePractice() {
     setShowErrorDetector(false);
 
     try {
-      const ex = await generateExercise(currentTopic, currentDifficulty, lang);
+      const ex = await generateExercise(currentTopic, currentDifficulty, lang, prevQuestions);
       setExercise(ex);
+      // Append to history, keep last 5 to avoid inflating the prompt
+      setPreviousQuestions((prev) => {
+        const updated = [...prev, ex.question];
+        return updated.length > 5 ? updated.slice(-5) : updated;
+      });
       setPhase("question");
       setTimeout(() => answerRef.current?.focus(), 100);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      // Show friendly message — never show raw stack or technical noise
       const friendly =
         raw.includes("No AI engine") || raw.includes("API key")
           ? (lang === "es"
@@ -113,7 +121,8 @@ export function InfinitePractice() {
     setConsecutiveCorrect(0);
     setConsecutiveWrong(0);
     setDifficulty("easy");
-    void fetchExercise(topic.trim(), "easy");
+    setPreviousQuestions([]);
+    void fetchExercise(topic.trim(), "easy", []);
   }, [topic, fetchExercise]);
 
   const handleCheck = useCallback(() => {
@@ -145,8 +154,8 @@ export function InfinitePractice() {
   }, [exercise, userAnswer, consecutiveCorrect, consecutiveWrong, difficulty, recordPractice]);
 
   const handleNext = useCallback(() => {
-    void fetchExercise(topic.trim(), difficulty);
-  }, [topic, difficulty, fetchExercise]);
+    void fetchExercise(topic.trim(), difficulty, previousQuestions);
+  }, [topic, difficulty, fetchExercise, previousQuestions]);
 
   const canGenerate =
     typeof window !== "undefined" &&
@@ -341,7 +350,7 @@ export function InfinitePractice() {
 
       {/* Back to setup */}
       <button
-        onClick={() => { setPhase("setup"); setExercise(null); }}
+        onClick={() => { setPhase("setup"); setExercise(null); setPreviousQuestions([]); }}
         className="text-xs text-aula-ink-soft hover:text-aula-ink text-center transition-colors"
       >
         {t("common.cancel")}
