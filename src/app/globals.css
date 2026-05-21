@@ -225,22 +225,42 @@
 }
 
 /* ── Accessibility: text size ────────────────────── */
-html.aula-text-large  body { font-size: 1.125rem; line-height: 1.75; }
-html.aula-text-xl     body { font-size: 1.25rem;  line-height: 1.85; letter-spacing: 0.01em; }
+/* Apply to html so rem-based Tailwind utilities scale proportionally */
+html.aula-text-large  { font-size: 112.5%; line-height: 1.75; }
+html.aula-text-xl     { font-size: 125%;   line-height: 1.85; letter-spacing: 0.01em; }
 
-/* ── Accessibility: high contrast ───────────────── */
+/* ── Accessibility: high contrast (dark mode) ────── */
+/* CSS variable overrides — work when utilities reference var(--color-*) */
 html.aula-high-contrast {
-  --color-aula-ink:       #000000;
-  --color-aula-ink-soft:  #333333;
-  --color-aula-bg:        #FFFFFF;
-  --color-aula-surface:   #FFFFFF;
-  --color-aula-border:    #000000;
-  --aula-ink:             #000000;
-  --aula-ink-soft:        #333333;
+  --color-aula-bg:        #0a0a0a;
+  --color-aula-surface:   #111111;
+  --color-aula-ink:       #FFFFFF;
+  --color-aula-ink-soft:  #CCCCCC;
+  --color-aula-border:    #555555;
+  --aula-bg:              #0a0a0a;
+  --aula-ink:             #FFFFFF;
+  --aula-ink-soft:        #CCCCCC;
 }
-html.aula-high-contrast .bg-aula-bg  { background-color: #FFFFFF; }
-html.aula-high-contrast .border-aula-border { border-color: #000000; }
-html.aula-high-contrast .text-aula-ink-soft { color: #333333; }
+/* Explicit !important overrides for Tailwind utility classes that may inline values */
+html.aula-high-contrast body {
+  background-color: #0a0a0a !important;
+  color: #FFFFFF !important;
+}
+html.aula-high-contrast .bg-white,
+html.aula-high-contrast .bg-aula-bg,
+html.aula-high-contrast .bg-aula-surface {
+  background-color: #111111 !important;
+}
+html.aula-high-contrast .bg-gray-50  { background-color: #1a1a1a !important; }
+html.aula-high-contrast .bg-gray-100 { background-color: #1f1f1f !important; }
+html.aula-high-contrast .text-aula-ink      { color: #FFFFFF !important; }
+html.aula-high-contrast .text-aula-ink-soft,
+html.aula-high-contrast .text-gray-500,
+html.aula-high-contrast .text-muted-foreground { color: #CCCCCC !important; }
+html.aula-high-contrast .border-aula-border,
+html.aula-high-contrast .border-gray-100,
+html.aula-high-contrast .border-gray-200 { border-color: #444444 !important; }
+html.aula-high-contrast .shadow-sm { box-shadow: 0 1px 3px rgba(255,255,255,0.08); }
 
 /* ── Accessibility: reduce motion ───────────────── */
 html.aula-reduce-motion *,
@@ -251,13 +271,15 @@ html.aula-reduce-motion *::after {
   transition-duration: 0.01ms !important;
 }
 
-/* ── Easy reading: wider line spacing in chat ────── */
-html.aula-easy-reading .prose,
-html.aula-easy-reading p {
-  line-height: 1.9;
-  letter-spacing: 0.02em;
-  word-spacing: 0.05em;
+/* ── Easy reading: line spacing on all text elements ── */
+html.aula-easy-reading p,
+html.aula-easy-reading li,
+html.aula-easy-reading .prose * {
+  line-height: 1.9 !important;
+  letter-spacing: 0.03em;
+  word-spacing: 0.08em;
 }
+html.aula-easy-reading p { max-width: 70ch; }
 
 /* ── Bubble pop-in ───────────────────────────────── */
 @keyframes bubble-in {
