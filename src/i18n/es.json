@@ -283,6 +283,35 @@
   "achievement.marathon.desc": "Completaste 10 ejercicios de práctica",
   "achievement.artist.title": "Artista",
   "achievement.artist.desc": "Generaste una ilustración con IA",
+  "achievement.quiz-taken.title": "Examinado",
+  "achievement.quiz-taken.desc": "Completaste tu primer quiz interactivo",
+  "achievement.quiz-perfect.title": "Perfecto",
+  "achievement.quiz-perfect.desc": "Obtuviste 100% en un quiz",
+  "achievement.cartographer.title": "Cartógrafo",
+  "achievement.cartographer.desc": "Creaste tu primer mapa mental",
 
-  "toast.achievementUnlocked": "¡Logro desbloqueado!"
+  "toast.achievementUnlocked": "¡Logro desbloqueado!",
+
+  "nav.quiz": "Quiz",
+
+  "quiz.title": "Quiz Interactivo",
+  "quiz.subtitle": "Pon a prueba tus conocimientos con preguntas generadas por IA.",
+  "quiz.topic": "Tema",
+  "quiz.topicPlaceholder": "Ej: Fracciones, Independencia, Newton…",
+  "quiz.count": "Preguntas",
+  "quiz.level": "Nivel",
+  "quiz.start": "Empezar quiz",
+  "quiz.generating": "Generando preguntas…",
+  "quiz.progress": "{n} / {total}",
+  "quiz.next": "Siguiente →",
+  "quiz.finish": "Ver resultados",
+  "quiz.cloudRequired": "El quiz interactivo requiere Cloud Boost. Agrega tu clave de Google AI Studio en Configuración.",
+  "quiz.result.excellent": "¡Excelente! Dominas el tema.",
+  "quiz.result.good": "¡Muy bien! Vas por buen camino.",
+  "quiz.result.ok": "Bien. Repasa los temas fallados.",
+  "quiz.result.keep": "¡Sigue practicando! Ya llegarás.",
+  "quiz.result.review": "Respuestas incorrectas:",
+  "quiz.result.yourAnswer": "Tu respuesta",
+  "quiz.result.correct": "Correcta",
+  "quiz.result.retry": "Intentar de nuevo"
 }

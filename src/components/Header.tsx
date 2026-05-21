@@ -110,6 +110,7 @@ export function Header({ resolvedEngineId, cloudForImage, onMenuClick }: HeaderP
       <nav className="flex items-center gap-2" aria-label="Navegación principal">
         {navLink("/chat",     "nav.chat")}
         {navLink("/practice", "nav.practice")}
+        {navLink("/quiz",     "nav.quiz")}
         {navLink("/teacher",  "nav.teacher")}
         <Link
           href="/logros"

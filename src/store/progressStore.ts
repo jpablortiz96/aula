@@ -71,6 +71,9 @@ interface ProgressState {
   hasUsedEquationBuilder:  boolean;
   hasUsedIllustrator:      boolean;
   practiceExerciseCount:   number;
+  hasCompletedQuiz:        boolean;
+  hasPerfectQuiz:          boolean;
+  hasUsedMindMap:          boolean;
 
   pendingAchievement:         string | null;
   consumePendingAchievement:  () => void;
@@ -88,6 +91,8 @@ interface ProgressState {
   recordEquationBuilderUsed:   () => void;
   recordPracticeExercise:      () => void;
   recordIllustratorUsed:       () => void;
+  recordInteractiveQuizCompleted: (score: number, total: number) => void;
+  recordMindMapUsed:           () => void;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -109,6 +114,9 @@ export const useProgressStore = create<ProgressState>()(
       hasUsedEquationBuilder:  false,
       hasUsedIllustrator:      false,
       practiceExerciseCount:   0,
+      hasCompletedQuiz:        false,
+      hasPerfectQuiz:          false,
+      hasUsedMindMap:          false,
       pendingAchievement:      null,
 
       consumePendingAchievement: () => set({ pendingAchievement: null }),
@@ -214,6 +222,27 @@ export const useProgressStore = create<ProgressState>()(
         if (hasUsedIllustrator) return;
         set({ hasUsedIllustrator: true });
         unlockAchievement("artist");
+      },
+
+      recordInteractiveQuizCompleted: (score: number, total: number) => {
+        const { hasCompletedQuiz, hasPerfectQuiz, unlockAchievement, addXP } = get();
+        if (!hasCompletedQuiz) {
+          set({ hasCompletedQuiz: true });
+          unlockAchievement("quiz-taken");
+        }
+        const xpEarned = score * 5;
+        addXP(xpEarned);
+        if (score === total && total > 0 && !hasPerfectQuiz) {
+          set({ hasPerfectQuiz: true });
+          unlockAchievement("quiz-perfect");
+        }
+      },
+
+      recordMindMapUsed: () => {
+        const { hasUsedMindMap, unlockAchievement } = get();
+        if (hasUsedMindMap) return;
+        set({ hasUsedMindMap: true });
+        unlockAchievement("cartographer");
       },
     }),
     { name: "aula-progress" },
