@@ -138,7 +138,6 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
 
         {/* SVG viewport */}
         <div className="flex-1 overflow-auto bg-gray-50 flex items-center justify-center p-6 min-h-[300px]">
-          {/* Zoom wrapper — scale applied via inline style to avoid effect timing */}
           <div
             style={{
               transform: `scale(${scale})`,
@@ -146,13 +145,15 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
               transition: "transform 0.15s ease-out",
             }}
           >
-            {/* dangerouslySetInnerHTML: React renders SVG synchronously,
-                no effect-timing race. svgRef only used for PNG export. */}
-            <div
-              ref={svgRef}
-              className="[&_svg]:max-w-full [&_svg]:h-auto [&_svg]:block"
-              dangerouslySetInnerHTML={{ __html: svgMarkup }}
-            />
+            {/* Only mount SVG when open — prevents duplicate IDs in the DOM
+                (thumbnail + lightbox both rendered = SVG id conflicts break refs) */}
+            {open && svgMarkup && (
+              <div
+                ref={svgRef}
+                className="[&_svg]:max-w-full [&_svg]:h-auto [&_svg]:block"
+                dangerouslySetInnerHTML={{ __html: svgMarkup }}
+              />
+            )}
           </div>
         </div>
       </div>
