@@ -313,5 +313,11 @@
   "quiz.result.review": "Respuestas incorrectas:",
   "quiz.result.yourAnswer": "Tu respuesta",
   "quiz.result.correct": "Correcta",
-  "quiz.result.retry": "Intentar de nuevo"
+  "quiz.result.retry": "Intentar de nuevo",
+
+  "mindmap.button": "🗺️ Mapa mental",
+  "mindmap.generating": "Generando mapa…",
+  "mindmap.badge": "☁️ Mapa mental — Cloud Boost",
+  "mindmap.error": "No se pudo generar el mapa mental.",
+  "mindmap.noKey": "El mapa mental requiere Cloud Boost. Configura tu clave en Configuración."
 }

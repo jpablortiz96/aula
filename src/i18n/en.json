@@ -313,5 +313,11 @@
   "quiz.result.review": "Incorrect answers:",
   "quiz.result.yourAnswer": "Your answer",
   "quiz.result.correct": "Correct",
-  "quiz.result.retry": "Try again"
+  "quiz.result.retry": "Try again",
+
+  "mindmap.button": "🗺️ Mind map",
+  "mindmap.generating": "Generating map…",
+  "mindmap.badge": "☁️ Mind map — Cloud Boost",
+  "mindmap.error": "Could not generate the mind map.",
+  "mindmap.noKey": "Mind maps require Cloud Boost. Set up your key in Settings."
 }
