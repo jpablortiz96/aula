@@ -100,12 +100,10 @@ function AssistantBubble({
   const [illustrating,    setIllustrating]    = useState(false);
   const [illustrateError, setIllustrateError] = useState<string | null>(null);
 
-  const [mindMap,          setMindMap]          = useState<string | null>(null);
-  const [renderedMindSvg,  setRenderedMindSvg]  = useState<string | null>(null);
-  const [mappingMind,      setMappingMind]      = useState(false);
-  const [mindMapError,     setMindMapError]     = useState<string | null>(null);
-  const [mindLightbox,     setMindLightbox]     = useState(false);
-  const [illLightbox,      setIllLightbox]      = useState(false);
+  const [mindMap,      setMindMap]      = useState<string | null>(null);
+  const [mappingMind,  setMappingMind]  = useState(false);
+  const [mindMapError, setMindMapError] = useState<string | null>(null);
+  const [illLightbox,  setIllLightbox]  = useState(false);
 
   async function handleIllustrate() {
     if (!onIllustrate || illustrating) return;
@@ -159,29 +157,27 @@ function AssistantBubble({
         {streaming && <span className="aula-cursor" aria-hidden="true" />}
       </div>
 
-      {/* Illustration */}
+      {/* Illustration — lightbox always mounted so ref is valid when opened */}
       {illustration && (
-        <>
+        <div
+          className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => setIllLightbox(true)}
+          title={t("lightbox.expand")}
+        >
+          <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")} · {t("lightbox.expand")}</p>
           <div
-            className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => setIllLightbox(true)}
-            title={t("lightbox.expand")}
-          >
-            <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")} · {t("lightbox.expand")}</p>
-            <div
-              className="w-full pointer-events-none"
-              dangerouslySetInnerHTML={{ __html: illustration }}
-              aria-label={t("illustrator.badge")}
-            />
-          </div>
-          <SvgLightbox
-            svgMarkup={illustration}
-            filename="aula-illustration"
-            open={illLightbox}
-            onClose={() => setIllLightbox(false)}
+            className="w-full pointer-events-none"
+            dangerouslySetInnerHTML={{ __html: illustration }}
+            aria-label={t("illustrator.badge")}
           />
-        </>
+        </div>
       )}
+      <SvgLightbox
+        svgMarkup={illustration ?? ""}
+        filename="aula-illustration"
+        open={illLightbox}
+        onClose={() => setIllLightbox(false)}
+      />
       {illustrateError && (
         <div className="mt-1 ml-1">
           <p className="text-[10px] text-aula-red leading-relaxed">{illustrateError}</p>
@@ -193,26 +189,12 @@ function AssistantBubble({
         </div>
       )}
 
-      {/* Mind map */}
+      {/* Mind map — MermaidRenderer manages its own lightbox */}
       {mindMap && (
-        <>
-          <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
-            <p className="text-[10px] text-aula-ink-soft mb-1">{t("mindmap.badge")} · {t("lightbox.expand")}</p>
-            <MermaidRenderer
-              chart={mindMap}
-              onRender={(svg) => setRenderedMindSvg(svg)}
-              onExpand={renderedMindSvg ? () => setMindLightbox(true) : undefined}
-            />
-          </div>
-          {renderedMindSvg && (
-            <SvgLightbox
-              svgMarkup={renderedMindSvg}
-              filename="aula-mind-map"
-              open={mindLightbox}
-              onClose={() => setMindLightbox(false)}
-            />
-          )}
-        </>
+        <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
+          <p className="text-[10px] text-aula-ink-soft mb-1">{t("mindmap.badge")} · {t("lightbox.expand")}</p>
+          <MermaidRenderer chart={mindMap} filename="aula-mind-map" />
+        </div>
       )}
       {mindMapError && (
         <div className="mt-1 ml-1">

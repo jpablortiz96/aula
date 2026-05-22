@@ -16,31 +16,56 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Reset scale when opening
+  useEffect(() => {
+    if (open) setScale(1);
+  }, [open]);
+
+  // Escape key
   useEffect(() => {
     if (!open) return;
-    setScale(1);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Body scroll lock
   useEffect(() => {
-    if (open && containerRef.current) {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  // Write SVG into container — rAF ensures DOM is painted before we write
+  useEffect(() => {
+    if (!open || !svgMarkup) return;
+    const id = requestAnimationFrame(() => {
+      if (!containerRef.current) return;
       containerRef.current.innerHTML = svgMarkup;
-    }
+      const svg = containerRef.current.querySelector("svg");
+      if (svg) {
+        svg.style.maxWidth  = "100%";
+        svg.style.maxHeight = "70vh";
+        svg.style.width     = "auto";
+        svg.style.height    = "auto";
+        if (!svg.getAttribute("viewBox")) {
+          const w = svg.getAttribute("width")  || "800";
+          const h = svg.getAttribute("height") || "600";
+          svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        }
+      }
+    });
+    return () => cancelAnimationFrame(id);
   }, [open, svgMarkup]);
 
+  // Zoom transform
   useEffect(() => {
     if (!containerRef.current) return;
     const svg = containerRef.current.querySelector("svg");
     if (svg) {
-      svg.style.transform = `scale(${scale})`;
+      svg.style.transform       = `scale(${scale})`;
       svg.style.transformOrigin = "center center";
-      svg.style.transition = "transform 0.15s ease-out";
+      svg.style.transition      = "transform 0.15s ease-out";
     }
   }, [scale]);
 
@@ -63,14 +88,14 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
     const url        = URL.createObjectURL(svgBlob);
     const img        = new Image();
     img.onload = () => {
-      const canvas   = document.createElement("canvas");
-      const w        = (img.width  || 800) * 2;
-      const h        = (img.height || 600) * 2;
-      canvas.width   = w;
-      canvas.height  = h;
-      const ctx      = canvas.getContext("2d");
+      const canvas  = document.createElement("canvas");
+      const w       = (img.width  || 800) * 2;
+      const h       = (img.height || 600) * 2;
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx     = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.fillStyle  = "white";
+      ctx.fillStyle = "white";
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob((blob) => {
@@ -86,15 +111,16 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
     img.src = url;
   };
 
-  if (!open) return null;
-
+  // Always mounted — visibility controlled by CSS so refs are always valid
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      className={`fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 transition-opacity ${
+        open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
       onClick={onClose}
       role="dialog"
-      aria-modal="true"
-      aria-label={t("lightbox.close")}
+      aria-modal={open}
+      aria-hidden={!open}
     >
       <div
         className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden"
