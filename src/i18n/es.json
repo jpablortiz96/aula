@@ -326,5 +326,7 @@
   "lightbox.zoomOut": "Reducir",
   "lightbox.downloadSvg": "Descargar SVG",
   "lightbox.downloadPng": "Descargar PNG",
-  "lightbox.close": "Cerrar"
+  "lightbox.close": "Cerrar",
+
+  "settings.system.title": "Sistema y rendimiento (avanzado)"
 }

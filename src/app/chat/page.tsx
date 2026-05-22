@@ -8,8 +8,7 @@ import { Header } from "@/components/Header";
 import { SessionSidebar, SessionDrawer } from "@/components/SessionSidebar";
 import { ChatInterface } from "@/components/ChatInterface";
 import { AchievementToast } from "@/components/AchievementToast";
-import { GpuDiagnostics } from "@/components/GpuDiagnostics";
-import { BenchmarkPanel } from "@/components/BenchmarkPanel";
+
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,20 +191,6 @@ function ChatPageInner() {
                   )}
                 </CardContent>
               </Card>
-            )}
-
-            {/* GPU diagnostics */}
-            <GpuDiagnostics />
-
-            {/* Benchmark (local engines only) */}
-            {isLocal && (
-              <BenchmarkPanel
-                modelStatus={status}
-                tokensPerSecond={tokensPerSecond}
-                lastTtftMs={lastTtftMs}
-                lastTotalMs={lastTotalMs}
-                onRun={(p) => generate(p)}
-              />
             )}
 
             {/* Chat */}

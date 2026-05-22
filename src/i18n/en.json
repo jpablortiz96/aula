@@ -326,5 +326,7 @@
   "lightbox.zoomOut": "Zoom out",
   "lightbox.downloadSvg": "Download SVG",
   "lightbox.downloadPng": "Download PNG",
-  "lightbox.close": "Close"
+  "lightbox.close": "Close",
+
+  "settings.system.title": "System and performance (advanced)"
 }

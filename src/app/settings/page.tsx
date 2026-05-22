@@ -330,12 +330,19 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Hardware Diagnostics */}
-        <div className="space-y-1.5">
-          <h2 className="text-sm font-heading font-semibold text-aula-ink">{t("settings.hardware.title")}</h2>
-          <GpuDiagnostics />
-          <RamInfo />
-        </div>
+        {/* System & performance — collapsible */}
+        <details className="group bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors list-none">
+            🔧 {t("settings.system.title")}
+          </summary>
+          <div className="px-4 pb-4 pt-2 space-y-4 border-t border-gray-100">
+            <div className="space-y-1.5">
+              <h3 className="text-xs font-semibold text-aula-ink-soft uppercase tracking-wide">{t("settings.hardware.title")}</h3>
+              <GpuDiagnostics />
+              <RamInfo />
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   );
