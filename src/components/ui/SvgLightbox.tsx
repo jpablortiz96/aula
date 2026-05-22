@@ -11,10 +11,25 @@ interface Props {
   onClose:   () => void;
 }
 
+// SVGs from the AI often have viewBox but no width/height, giving them no
+// intrinsic size. Inject explicit dimensions so the browser renders them.
+function normalizeSvgDimensions(markup: string): string {
+  return markup.replace(/<svg([^>]*)>/, (match, attrs) => {
+    if (/\s(width|height)\s*=/.test(attrs)) return match;
+    const vbMatch = attrs.match(/viewBox="([^"]+)"/);
+    if (!vbMatch) return match;
+    const parts = vbMatch[1].trim().split(/[\s,]+/);
+    const w = parts[2] ?? "400";
+    const h = parts[3] ?? "300";
+    return `<svg${attrs} width="${w}" height="${h}">`;
+  });
+}
+
 export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
   const t    = useT();
   const [scale, setScale] = useState(1);
   const svgRef = useRef<HTMLDivElement>(null);
+  const normalizedMarkup = svgMarkup ? normalizeSvgDimensions(svgMarkup) : "";
 
   useEffect(() => { if (open) setScale(1); }, [open]);
 
@@ -44,7 +59,8 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
   function downloadPng() {
     const svgEl = svgRef.current?.querySelector("svg");
     if (!svgEl) return;
-    const svgString = new XMLSerializer().serializeToString(svgEl);
+    // Use normalized markup for correct dimensions in canvas
+    const svgString = normalizedMarkup || new XMLSerializer().serializeToString(svgEl);
     const svgBlob   = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url       = URL.createObjectURL(svgBlob);
     const img       = new Image();
@@ -147,11 +163,11 @@ export function SvgLightbox({ svgMarkup, filename, open, onClose }: Props) {
           >
             {/* Only mount SVG when open — prevents duplicate IDs in the DOM
                 (thumbnail + lightbox both rendered = SVG id conflicts break refs) */}
-            {open && svgMarkup && (
+            {open && normalizedMarkup && (
               <div
                 ref={svgRef}
                 className="[&_svg]:max-w-full [&_svg]:h-auto [&_svg]:block"
-                dangerouslySetInnerHTML={{ __html: svgMarkup }}
+                dangerouslySetInnerHTML={{ __html: normalizedMarkup }}
               />
             )}
           </div>
