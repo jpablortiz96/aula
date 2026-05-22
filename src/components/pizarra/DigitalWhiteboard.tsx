@@ -242,7 +242,7 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-gray-200">
+    <div className="flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-200">
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-white shrink-0 flex-wrap">
@@ -294,7 +294,7 @@ export function DigitalWhiteboard({ onSolve, onCancel, onCloudBoost }: Props) {
       </div>
 
       {/* Canvas */}
-      <div ref={containerRef} className="flex-1 min-h-0 relative" style={{ touchAction: "none" }}>
+      <div ref={containerRef} className="relative w-full" style={{ minHeight: "420px", touchAction: "none" }}>
         <canvas
           ref={canvasRef}
           onPointerDown={onPointerDown}

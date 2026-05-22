@@ -98,12 +98,10 @@ export default function PizarraPage() {
                 </span>
               </div>
 
-              <div className="min-h-[500px]">
-                <DigitalWhiteboard
-                  onSolve={handleWhiteboardSolve}
-                  onCloudBoost={handleCloudBoost}
-                />
-              </div>
+              <DigitalWhiteboard
+                onSolve={handleWhiteboardSolve}
+                onCloudBoost={handleCloudBoost}
+              />
             </>
           )}
         </div>
