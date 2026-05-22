@@ -73,6 +73,23 @@ const REHYPE_PLUGINS = [rehypeKatex];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function IllustrationViewer({ svgMarkup, badge, expandLabel }: { svgMarkup: string; badge: string; expandLabel: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div
+        className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto cursor-pointer hover:opacity-90 transition-opacity"
+        onClick={() => setOpen(true)}
+        title={expandLabel}
+      >
+        <p className="text-[10px] text-aula-ink-soft mb-1">{badge} · {expandLabel}</p>
+        <div className="w-full pointer-events-none [&_svg]:max-w-full [&_svg]:h-auto" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
+      </div>
+      <SvgLightbox svgMarkup={svgMarkup} filename="aula-illustration" open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
 function AssistantBubble({
   content,
   streaming,
@@ -103,7 +120,6 @@ function AssistantBubble({
   const [mindMap,      setMindMap]      = useState<string | null>(null);
   const [mappingMind,  setMappingMind]  = useState(false);
   const [mindMapError, setMindMapError] = useState<string | null>(null);
-  const [illLightbox,  setIllLightbox]  = useState(false);
 
   async function handleIllustrate() {
     if (!onIllustrate || illustrating) return;
@@ -157,27 +173,14 @@ function AssistantBubble({
         {streaming && <span className="aula-cursor" aria-hidden="true" />}
       </div>
 
-      {/* Illustration — lightbox always mounted so ref is valid when opened */}
+      {/* Illustration — self-contained component owns its own lightbox */}
       {illustration && (
-        <div
-          className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => setIllLightbox(true)}
-          title={t("lightbox.expand")}
-        >
-          <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")} · {t("lightbox.expand")}</p>
-          <div
-            className="w-full pointer-events-none"
-            dangerouslySetInnerHTML={{ __html: illustration }}
-            aria-label={t("illustrator.badge")}
-          />
-        </div>
+        <IllustrationViewer
+          svgMarkup={illustration}
+          badge={t("illustrator.badge")}
+          expandLabel={t("lightbox.expand")}
+        />
       )}
-      <SvgLightbox
-        svgMarkup={illustration ?? ""}
-        filename="aula-illustration"
-        open={illLightbox}
-        onClose={() => setIllLightbox(false)}
-      />
       {illustrateError && (
         <div className="mt-1 ml-1">
           <p className="text-[10px] text-aula-red leading-relaxed">{illustrateError}</p>
