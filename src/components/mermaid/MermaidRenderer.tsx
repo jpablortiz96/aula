@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/hooks/useT";
 
 let mermaidId = 0;
 
 interface MermaidRendererProps {
-  chart: string;
+  chart:      string;
   className?: string;
+  onRender?:  (svg: string) => void;
+  onExpand?:  () => void;
 }
 
-export function MermaidRenderer({ chart, className }: MermaidRendererProps) {
+export function MermaidRenderer({ chart, className, onRender, onExpand }: MermaidRendererProps) {
+  const t            = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +35,7 @@ export function MermaidRenderer({ chart, className }: MermaidRendererProps) {
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
           setError(null);
+          onRender?.(svg);
         }
       } catch (err) {
         if (!cancelled) {
@@ -41,7 +46,7 @@ export function MermaidRenderer({ chart, className }: MermaidRendererProps) {
 
     void render();
     return () => { cancelled = true; };
-  }, [chart]);
+  }, [chart, onRender]);
 
   if (error) {
     return (
@@ -54,7 +59,9 @@ export function MermaidRenderer({ chart, className }: MermaidRendererProps) {
   return (
     <div
       ref={containerRef}
-      className={`overflow-x-auto w-full ${className ?? ""}`}
+      className={`overflow-x-auto w-full ${onExpand ? "cursor-pointer hover:opacity-90 transition-opacity" : ""} ${className ?? ""}`}
+      onClick={onExpand}
+      title={onExpand ? t("lightbox.expand") : undefined}
       aria-label="Mind map diagram"
     />
   );

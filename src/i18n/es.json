@@ -319,5 +319,12 @@
   "mindmap.generating": "Generando mapa…",
   "mindmap.badge": "☁️ Mapa mental — Cloud Boost",
   "mindmap.error": "No se pudo generar el mapa mental.",
-  "mindmap.noKey": "El mapa mental requiere Cloud Boost. Configura tu clave en Configuración."
+  "mindmap.noKey": "El mapa mental requiere Cloud Boost. Configura tu clave en Configuración.",
+
+  "lightbox.expand": "Click para ampliar y descargar",
+  "lightbox.zoomIn": "Ampliar",
+  "lightbox.zoomOut": "Reducir",
+  "lightbox.downloadSvg": "Descargar SVG",
+  "lightbox.downloadPng": "Descargar PNG",
+  "lightbox.close": "Cerrar"
 }

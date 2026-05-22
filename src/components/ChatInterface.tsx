@@ -30,6 +30,7 @@ import { extractTextFromImage } from "@/lib/ocr/localOcr";
 import { generateIllustration } from "@/lib/illustrate";
 import { generateMindMap } from "@/lib/mermaidGenerate";
 import { MermaidRenderer } from "@/components/mermaid/MermaidRenderer";
+import { SvgLightbox } from "@/components/ui/SvgLightbox";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,9 +100,12 @@ function AssistantBubble({
   const [illustrating,    setIllustrating]    = useState(false);
   const [illustrateError, setIllustrateError] = useState<string | null>(null);
 
-  const [mindMap,      setMindMap]      = useState<string | null>(null);
-  const [mappingMind,  setMappingMind]  = useState(false);
-  const [mindMapError, setMindMapError] = useState<string | null>(null);
+  const [mindMap,          setMindMap]          = useState<string | null>(null);
+  const [renderedMindSvg,  setRenderedMindSvg]  = useState<string | null>(null);
+  const [mappingMind,      setMappingMind]      = useState(false);
+  const [mindMapError,     setMindMapError]     = useState<string | null>(null);
+  const [mindLightbox,     setMindLightbox]     = useState(false);
+  const [illLightbox,      setIllLightbox]      = useState(false);
 
   async function handleIllustrate() {
     if (!onIllustrate || illustrating) return;
@@ -157,14 +161,26 @@ function AssistantBubble({
 
       {/* Illustration */}
       {illustration && (
-        <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
-          <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")}</p>
+        <>
           <div
-            className="w-full"
-            dangerouslySetInnerHTML={{ __html: illustration }}
-            aria-label={t("illustrator.badge")}
+            className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => setIllLightbox(true)}
+            title={t("lightbox.expand")}
+          >
+            <p className="text-[10px] text-aula-ink-soft mb-1">{t("illustrator.badge")} · {t("lightbox.expand")}</p>
+            <div
+              className="w-full pointer-events-none"
+              dangerouslySetInnerHTML={{ __html: illustration }}
+              aria-label={t("illustrator.badge")}
+            />
+          </div>
+          <SvgLightbox
+            svgMarkup={illustration}
+            filename="aula-illustration"
+            open={illLightbox}
+            onClose={() => setIllLightbox(false)}
           />
-        </div>
+        </>
       )}
       {illustrateError && (
         <div className="mt-1 ml-1">
@@ -179,10 +195,24 @@ function AssistantBubble({
 
       {/* Mind map */}
       {mindMap && (
-        <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
-          <p className="text-[10px] text-aula-ink-soft mb-1">{t("mindmap.badge")}</p>
-          <MermaidRenderer chart={mindMap} />
-        </div>
+        <>
+          <div className="mt-2 rounded-xl border border-aula-border bg-white p-2 overflow-x-auto">
+            <p className="text-[10px] text-aula-ink-soft mb-1">{t("mindmap.badge")} · {t("lightbox.expand")}</p>
+            <MermaidRenderer
+              chart={mindMap}
+              onRender={(svg) => setRenderedMindSvg(svg)}
+              onExpand={renderedMindSvg ? () => setMindLightbox(true) : undefined}
+            />
+          </div>
+          {renderedMindSvg && (
+            <SvgLightbox
+              svgMarkup={renderedMindSvg}
+              filename="aula-mind-map"
+              open={mindLightbox}
+              onClose={() => setMindLightbox(false)}
+            />
+          )}
+        </>
       )}
       {mindMapError && (
         <div className="mt-1 ml-1">

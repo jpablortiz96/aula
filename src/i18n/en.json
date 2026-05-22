@@ -319,5 +319,12 @@
   "mindmap.generating": "Generating map…",
   "mindmap.badge": "☁️ Mind map — Cloud Boost",
   "mindmap.error": "Could not generate the mind map.",
-  "mindmap.noKey": "Mind maps require Cloud Boost. Set up your key in Settings."
+  "mindmap.noKey": "Mind maps require Cloud Boost. Set up your key in Settings.",
+
+  "lightbox.expand": "Click to expand and download",
+  "lightbox.zoomIn": "Zoom in",
+  "lightbox.zoomOut": "Zoom out",
+  "lightbox.downloadSvg": "Download SVG",
+  "lightbox.downloadPng": "Download PNG",
+  "lightbox.close": "Close"
 }
