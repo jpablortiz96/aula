@@ -1,0 +1,6 @@
+# <type>(<scope>): <subject>
+#
+# <body — optional>
+#
+# Types: feat, fix, docs, style, refactor, test, chore
+# NO trailers. NO "Co-Authored-By". NO "Generated with".
