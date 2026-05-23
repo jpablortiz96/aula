@@ -14,7 +14,7 @@ internet is not an inconvenience — it is the default.**
 [![License MIT](https://img.shields.io/badge/License-MIT-FBBC04?style=flat-square)](./LICENSE)
 [![DEV.to Challenge](https://img.shields.io/badge/DEV.to-Gemma_4_Challenge-34A853?style=flat-square)](https://dev.to/challenges/gemma)
 
-[**Live demo**](https://aula.run) · [**Video walkthrough**](#) · [**Architecture**](#architecture) · [**Why this matters**](#the-problem)
+[**Video walkthrough**](https://youtu.be/d0jN8Kw_Cz4) · [**Architecture**](#architecture) · [**Why this matters**](#the-problem)
 
 </div>
 
