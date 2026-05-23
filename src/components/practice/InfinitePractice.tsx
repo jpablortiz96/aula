@@ -102,15 +102,11 @@ export function InfinitePractice() {
 
     const apiKey = localStorage.getItem("aula:google-ai-api-key") ?? "";
 
-    const timeoutMsg = lang === "es"
-      ? "La generación tardó demasiado. Intenta de nuevo."
-      : "Generation timed out. Please try again.";
-
     try {
       const ex = await Promise.race([
         generateExercise({ apiKey, topic: currentTopic, difficulty: currentDifficulty, lang, previousQuestions: prevQuestions }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(timeoutMsg)), 30_000)
+          setTimeout(() => reject(new Error("timeout")), 60_000)
         ),
       ]);
       setExercise(ex);
@@ -123,15 +119,17 @@ export function InfinitePractice() {
       setTimeout(() => answerRef.current?.focus(), 100);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      const friendly = raw.includes("401")
-        ? (lang === "es"
-            ? "API key inválida. Verifica tu clave en Configuración."
-            : "Invalid API key. Check your key in Settings.")
-        : raw.includes("429")
+      const friendly = raw === "timeout"
+        ? t("practice.timeoutSpecific")
+        : raw.includes("401")
           ? (lang === "es"
-              ? "Límite de solicitudes alcanzado. Espera un momento e intenta de nuevo."
-              : "Rate limit reached. Wait a moment and try again.")
-          : raw;
+              ? "API key inválida. Verifica tu clave en Configuración."
+              : "Invalid API key. Check your key in Settings.")
+          : raw.includes("429")
+            ? (lang === "es"
+                ? "Límite de solicitudes alcanzado. Espera un momento e intenta de nuevo."
+                : "Rate limit reached. Wait a moment and try again.")
+            : raw;
       setError(friendly);
       setPhase("setup");
     }
@@ -165,6 +163,7 @@ export function InfinitePractice() {
       setConsecutiveWrong(0);
       const newDiff = nextDifficulty(difficulty, newConsec, 0);
       setDifficulty(newDiff);
+      if (newDiff !== difficulty) setPreviousQuestions([]);
     } else {
       setSessionStreak(0);
       setConsecutiveCorrect(0);
@@ -172,6 +171,7 @@ export function InfinitePractice() {
       setConsecutiveWrong(newConsec);
       const newDiff = nextDifficulty(difficulty, 0, newConsec);
       setDifficulty(newDiff);
+      if (newDiff !== difficulty) setPreviousQuestions([]);
       setShowErrorDetector(true);
     }
   }, [exercise, userAnswer, consecutiveCorrect, consecutiveWrong, difficulty, recordPractice]);

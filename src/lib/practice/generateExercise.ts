@@ -51,6 +51,19 @@ function buildUserPrompt(
 
 // ── Main functions ────────────────────────────────────────────────────────────
 
+const LEVEL_DESCRIPTORS: Record<"es" | "en", Record<Difficulty, string>> = {
+  es: {
+    easy:   "fácil (operaciones básicas, un solo concepto, para principiantes)",
+    medium: "intermedio (combina dos conceptos, números más grandes o contextos)",
+    hard:   "difícil (varios pasos, conceptos avanzados, requiere razonamiento)",
+  },
+  en: {
+    easy:   "easy (basic operations, single concept, for beginners)",
+    medium: "medium (combines two concepts, larger numbers or richer context)",
+    hard:   "hard (multiple steps, advanced concepts, requires reasoning)",
+  },
+};
+
 export async function generateExercise({
   apiKey,
   topic,
@@ -64,10 +77,7 @@ export async function generateExercise({
   lang:               "es" | "en";
   previousQuestions?: string[];
 }): Promise<Exercise> {
-  const diffLabel =
-    lang === "es"
-      ? { easy: "fácil", medium: "medio", hard: "difícil" }[difficulty]
-      : difficulty;
+  const diffLabel = LEVEL_DESCRIPTORS[lang][difficulty];
 
   const systemContent = buildSystemPrompt(lang);
 

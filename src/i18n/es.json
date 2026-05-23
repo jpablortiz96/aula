@@ -244,6 +244,7 @@
   "practice.goToSettings": "Ir a Configuración →",
   "practice.cloudBadge": "☁️ Cloud (Gemma 4 26B)",
   "practice.session": "Ejercicio {n}",
+  "practice.timeoutSpecific": "El modelo está tardando más de lo normal. Esto puede pasar al subir de dificultad. Reintenta o cambia de tema.",
 
   "illustrator.button": "🎨 Ilústralo",
   "illustrator.generating": "Generando ilustración…",
